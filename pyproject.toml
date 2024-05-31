@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "registrator-romania"
+version = "0.1.0"
+description = "Script what automaticly registrate users from google sheet on https://cetatenie.just.ro/programare-online/"
+authors = ["devtolmachev <dev.tolmachev@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+gspread-asyncio = "^2.0.0"
+apscheduler = "^3.10.4"
+playwright = "^1.44.0"
+loguru = "^0.7.2"
+envyaml = "^1.10.211231"
+pandas = "^2.2.2"
+aiogram = "^3.6.0"
+bs4 = "^0.0.2"
+lxml = "^5.2.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
