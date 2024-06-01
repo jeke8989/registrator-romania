@@ -1,7 +1,7 @@
 import asyncio
 import os
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from registrator_romania.scheduler import start_scheduler
 
@@ -21,9 +21,9 @@ async def main() -> None:
         process = subprocess.Popen(
             ["Xvfb", ":99", "-screen", "0", "1024x768x16"]
         )
-
-    dt = datetime.now() + timedelta(seconds=5)
-    await start_scheduler(start_date=dt)
+    
+    dt = datetime.now() + timedelta(seconds=10)
+    await start_scheduler(hour=dt.hour, minute=dt.minute, second=dt.second)
     await keep_running()
     
     if process:

@@ -6,6 +6,7 @@ import random
 import re
 import subprocess
 from datetime import datetime
+import time
 from typing import TYPE_CHECKING, Generator
 
 from bs4 import BeautifulSoup, Tag
@@ -94,14 +95,14 @@ async def fill_inputs(page: Page, row: Series, test: bool = False) -> None:
     series_passport = row["Serie și număr Pașaport"]
 
     if test:
-        random.shuffle(first_name)
-        random.shuffle(last_name)
-        random.shuffle(father_name)
-        random.shuffle(mother_name)
-        random.shuffle(birthday_place)
-        random.shuffle(date_of_birthday)
-        random.shuffle(email)
-        random.shuffle(series_passport)
+        first_name = ''.join(random.sample(first_name, len(first_name)))
+        last_name = ''.join(random.sample(last_name, len(last_name)))
+        date_of_birthday = ''.join(random.sample(date_of_birthday, len(date_of_birthday)))
+        birthday_place = ''.join(random.sample(birthday_place, len(birthday_place)))
+        mother_name = ''.join(random.sample(mother_name, len(mother_name)))
+        father_name = ''.join(random.sample(father_name, len(father_name)))
+        email = ''.join(random.sample(email, len(email)))
+        series_passport = ''.join(random.sample(series_passport, len(series_passport)))
 
     await page.type("//input[@id='nume_pasaport']", first_name)
     await page.type("//input[@id='data_nasterii']", date_of_birthday)
@@ -115,31 +116,39 @@ async def fill_inputs(page: Page, row: Series, test: bool = False) -> None:
 
 async def make_an_appointment(context: BrowserContext, row: Series) -> None:
     """Make an appointment."""
+    em = row["Adresa de email"]
+    logger.info(f"start work of row = {em}. open page...")
     page = await context.new_page()
     await page.goto(URL)
-
+    
+    logger.info(f"select needed articolul...\n {em}")
     # Open dropdown with a list of articoluls.
     xpath_dropdown = "//span[@id='select2-tip_formular-container']"
     await page.click(xpath_dropdown)
 
     # Select needed artcolul
-    num = 10
+    num = 11
     xpath_articolul = (
         "//ul[@id='select2-tip_formular-results']//"
         f"li[contains(text(), 'ART. {num}') or contains(text(), 'ART {num}')]"
     )
     await page.click(xpath_articolul)
-
+    
+    logger.info(f"fill inputs... {em}")
     await fill_inputs(page, row, test=True)
+    logger.info(f"filling inputs successfully {em}")
 
     switch_month_btn_xpath = (
         "//div[@class='datepicker-days']//th[@class='datepicker-switch']"
     )
-    for month in await get_available_months(switch_month_btn_xpath, page):
+    months = await get_available_months(switch_month_btn_xpath, page)
+    logger.info(f"available month on articolul {num} - {months}")
+    for month in months:
         # Find needed month
-        if month.text != "Oct":
-            continue
-
+        # if month.text != "Oct":
+        #     continue
+        
+        logger.info(f"change month... row - {em}")
         await page.click(switch_month_btn_xpath)
         await page.click(
             f"//span[contains(@class, 'month') and text()='{month.text}']"
@@ -150,23 +159,27 @@ async def make_an_appointment(context: BrowserContext, row: Series) -> None:
         await page.wait_for_selector('//div[@class="loading"]', state="hidden")
 
         page_text = await page.content()
+        logger.info(f"changing month successfully for {em}.\nHTML\n\n{page_text}")
         soup = BeautifulSoup(page_text, "html.parser")
         cal = Calendar(soup)
-
+        
         for tag, dt in cal.iter_available_days():
             tag: Tag
             dt: datetime
 
             # Wait for a needed day
-            if dt.day != 2:
-                continue
-
+            # if dt.day != 2:
+            #     continue
+            
             # Select needed day
             await page.click(f"//td[@data-date='{tag["data-date"]}']")
             # Click on checkbox before finish
             await page.click("//input[@class='form-check-input']")
             # Click on the finish button
             await page.get_by_text(re.compile("Transmite.*")).click()
+            await asyncio.sleep(4)
+            html = await page.content()
+            logger.info(f"Press finish button. HTML:\n---\n{html}")
 
             # Wait for success message
             await page.get_by_text(re.compile(r"Felicitări!.*")).wait_for(
@@ -198,13 +211,23 @@ async def main() -> None:
                 await make_an_appointment(context, row)
             except Exception as exc:
                 logger.exception(exc)
+                if datetime.now() < datetime(2024, 1, 6, hour=9, minute=10):
+                    path = f"screenshots/{time.time()}-err.png"
+                    await context.pages[0].screenshot(path=path, full_page=True)
+                    logger.debug(f"Saved screenshot at path = {path}, after error.")
+                    
+                    await context.close()
+                    return await work(row)
 
             await context.close()
         
         tasks = []
-        for index, row in (await get_df()).iterrows():
-            tasks.append(work(row))
-            
+        df = await get_df()
+        for index, row in df.iterrows():
+            if len(tasks) <= 10:
+                logger.info(f"Create task for user {row}")
+                tasks.append(work(row))
+        
         result = await asyncio.gather(*tasks, return_exceptions=True)
         logger.info(f"{len(tasks)} runned. The result\n---\n{result}")
 
