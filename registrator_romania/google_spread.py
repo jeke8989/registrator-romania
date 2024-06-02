@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import gspread_asyncio
 from loguru import logger
@@ -32,9 +33,9 @@ async def get_df() -> DataFrame:
     logger.info("try to get sheet")
     sheet1 = await sheet.get_sheet1()
     logger.info("try to get records")
-    table_data = await sheet1.get_all_records()
-    # with open("spr.json") as f:
-    #     table_data = json.load(f)
+    # table_data = await sheet1.get_all_records()
+    with open("spr.json") as f:
+        table_data = json.load(f)
     df = DataFrame(table_data)
     logger.info(f"get records successfully.\n{df}")
 

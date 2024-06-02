@@ -16,6 +16,7 @@ pandas = "^2.2.2"
 aiogram = "^3.6.0"
 bs4 = "^0.0.2"
 lxml = "^5.2.2"
+fake-useragent = "^1.5.1"
 
 
 [build-system]
