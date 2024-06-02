@@ -14,6 +14,8 @@ from playwright.async_api import (
     Browser,
     BrowserContext,
     Page,
+    Request,
+    Response,
     Playwright,
     async_playwright,
 )
@@ -78,10 +80,11 @@ def error_attempts(attempts: int = 5):
 
 
 class ProgramareCetatenie:
-    def __init__(self) -> None:
+    def __init__(self, headless: bool = False) -> None:
         self.plw: Playwright | None = None
         self.context: BrowserContext | None = None
         self.browser: Browser | None = None
+        self._headless = headless
 
     async def _create_context(self) -> BrowserContext:
         return await self.browser.new_context(
@@ -90,7 +93,7 @@ class ProgramareCetatenie:
 
     async def __aenter__(self):
         self.plw = await async_playwright().start()
-        self.browser = await self.plw.chromium.launch(headless=False)
+        self.browser = await self.plw.chromium.launch(headless=self._headless)
         self.context = await self._create_context()
         return self
 
@@ -237,7 +240,8 @@ class ProgramareCetatenie:
             state="hidden",
         )
         # Click on the finish button
-        await page.get_by_text(re.compile("Transmite.*")).click()
+        btn = page.get_by_text(re.compile("Transmite.*"))
+        await btn.click(force=True)
         await asyncio.sleep(4)
         html = await page.content()
         logger.info(f"Press finish button. HTML:\n---\n{html}")
@@ -253,6 +257,19 @@ class ProgramareCetatenie:
         em = row["Adresa de email"]
         logger.info(f"start work of row = {em}. open page...")
         page = await self.context.new_page()
+        
+        def handle_request(request: Request):
+            logger.debug(f"Request: {request.method} {request.url}")
+            if request.post_data:
+                logger.debug(f"Post data: {request.post_data}")
+                
+        def handle_response(response: Response):
+            logger.debug(f"Response: {response.status} {response.url}")
+
+        # Привязка обработчиков событий
+        page.on("request", handle_request)
+        page.on("response", handle_response)
+
         await page.goto(URL)
         self.context.set_default_timeout(60000)
 
@@ -295,14 +312,14 @@ class ProgramareCetatenie:
 HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,my;q=0.6",
-    "Cache-Control": "no-cache",
-    "Connection": "keep-alive",
-    "Pragma": "no-cache",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Upgrade-Insecure-Requests": "1",
+    # "Cache-Control": "no-cache",
+    # "Connection": "keep-alive",
+    # "Pragma": "no-cache",
+    # "Sec-Fetch-Dest": "document",
+    # "Sec-Fetch-Mode": "navigate",
+    # "Sec-Fetch-Site": "none",
+    # "Sec-Fetch-User": "?1",
+    # "Upgrade-Insecure-Requests": "1",
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     "sec-ch-ua": '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
     "sec-ch-ua-mobile": "?0",
@@ -312,27 +329,22 @@ HEADERS = {
 
 async def wait_for_available_day(programare: ProgramareCetatenie):
     """Wait for available day."""
-    while True:
-        try:
-            page = await programare.context.new_page()
-            await programare.select_month("Oct", page)
-            assert await programare.select_day(2, page)
-        except Exception as err:
-            logger.exception(err)
-            dt = datetime.now()
-            if dt.hour >= 9 and dt.minute >= 10:
+    async with ProgramareCetatenie() as automator:
+        while True:
+            try:
+                page = await programare.context.new_page()
+                await programare.select_month("Oct", page)
+                assert await programare.select_day(2, page)
+            except Exception as err:  # noqa: PERF203
+                logger.exception(err)
+                await asyncio.sleep(60)
+            else:
                 return
-        else:
-            return
 
 
 async def main() -> None:
     """Entrypoint."""
     async with ProgramareCetatenie() as automator:
-        await wait_for_available_day(automator)
-        # page = await automator.context.new_page()
-        # await page.goto(URL)
-        # ...
 
         async def work(row: Series):
             try:
