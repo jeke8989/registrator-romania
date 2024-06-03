@@ -21,6 +21,8 @@ proxybroker = {git = "https://github.com/bluet/proxybroker2.git"}
 google-recaptcha = "^2.0.1"
 pypasser = "^0.0.5"
 ua-generator = "^0.5.0"
+esprima = "^4.0.1"
+pyjsparser = "^2.7.1"
 
 
 [build-system]

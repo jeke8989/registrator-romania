@@ -1,11 +1,17 @@
 import asyncio
+from calendar import monthrange
+from datetime import datetime, timedelta
+import json
+from pprint import pprint
 import random
 import string
 
 import aiohttp
+import pyjsparser
 import requests
 import ua_generator
-from bs4 import BeautifulSoup
+import esprima
+from bs4 import BeautifulSoup, Tag
 from fake_useragent import UserAgent
 from pypasser import reCaptchaV3
 
@@ -90,36 +96,61 @@ headers = {
 }
 
 
-async def get_date():
-    headers = {
-        "Accept": "*/*",
-        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,my;q=0.6",
-        "Connection": "keep-alive",
-        "Content-Type": "multipart/form-data; boundary=----WebKitFormBoundaryBAFqUEJZBFiTrpGE",
-        # 'Cookie': 'ADC_CONN_539B3595F4E=CDCB981DB7B86020AFD253C8C03B3BBC0E62E531671B481654F4529FFAB0BD45669E66157C80011F; ADC_REQ_2E94AF76E7=16C0E6F3593A4DE3DB6460302FCAD0D31FB5BF91F2EA2A0900D80EBF6E50C39870F691148C17265C; cetatenie_session=d5d4a5affd59e0d01a0dd86d4dca8d01b90f586d',
-        "Origin": "https://programarecetatenie.eu",
-        "Referer": "https://programarecetatenie.eu/",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "X-Requested-With": "XMLHttpRequest",
-        "sec-ch-ua": '"Google Chrome";v="125", "Chromium";v="125", "Not.A/Brand";v="24"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Linux"',
-    }
+@aiohttp_session()
+async def get_date(session: aiohttp.ClientSession, disabled_days: list[datetime], month: int, tip_formular: int, year: int = 2024):
+    r = RequestsRegistrator()
+    month = f"0{month}" if len(str(month)) == 1 else month
 
-    files = {
-        "azi": "2024-06",
-        "tip_formular": "3",
-    }
+    form = aiohttp.FormData()
+    form.add_field('azi', f"{year}-{month}")
+    form.add_field('tip_formular', str(tip_formular))
+    
+    # async with session.post(
+    #     'https://programarecetatenie.eu/status_zile', 
+    #     data=form
+    # ) as response:
+    #     text = await response.text()
+    #     with open("dates.json", "w") as f:
+    #         f.write(text)
+        
+    with open("dates.json") as f:
+        text = f.read()
+        
+    month = int(month)
+    
+    def get_dates_of_month():
+        dates = []
+        date_now = datetime.now()
+        
+        if date_now.month == month:
+            date = datetime(year=date_now.year, month=date_now.month, day=1)
+            
+            while date_now.day != date.day:
+                date = date + timedelta(days=1)
+                dates.append(date.date())
+            return dates
+        
+        elif date_now.month < month:
+            # If bigger passed month
 
-    response = requests.post(
-        "https://programarecetatenie.eu/status_zile",
-        headers=headers,
-        files=files,
-    )
-    print(response.content)
+            days = monthrange(year, month)[1]
+            return [
+                datetime(year=year, month=month, day=day).date()
+                for day in range(1, days + 1)
+            ]
+        
+        elif date_now.month > month:
+            raise ValueError("Current month is bigger than passed month!")
+    
+    dates = get_dates_of_month()
+    disabled_dates = [datetime.strptime(d, "%Y-%m-%d").date() for d in json.loads(text)["data"]]
+    available_dates = []
+    
+    for date in dates:
+        if date not in disabled_dates:
+            available_dates.append(date)
+    
+    return available_dates
 
 
 @aiohttp_session()
@@ -170,9 +201,59 @@ async def work(session: aiohttp.ClientSession):
     print(response.text)
 
 
+def extract_days_disable(js_code):
+    parsed_code = esprima.parseScript(js_code)
+    days_disable_dict = {}
+    for node in parsed_code.body:
+        if isinstance(node, esprima.nodes.FunctionDeclaration) and node.id.name == 'success':
+            for inner_node in node.body.body:
+                if isinstance(inner_node, esprima.nodes.SwitchStatement):
+                    for case in inner_node.cases:
+                        case_value = case.test.value
+                        for consequent in case.consequent:
+                            if isinstance(consequent, esprima.nodes.VariableDeclaration):
+                                for declaration in consequent.declarations:
+                                    if declaration.id.name == 'days_disable':
+                                        days_disable_values = [element.value for element in declaration.init.elements]
+                                        days_disable_dict[case_value] = days_disable_values
+    return days_disable_dict
+
+def find_days_disable(js_code, tip_formular_value):
+    parser = pyjsparser.PyJsParser()
+    parsed_code = parser.parse(js_code)
+    
+    for stmt in parsed_code['body']:
+        if stmt['type'] == 'ExpressionStatement' and stmt['expression']['type'] == 'CallExpression':
+            for sub_stmt in stmt['expression']['arguments'][0]['body']['body']:
+                if sub_stmt['type'] == 'VariableDeclaration' and sub_stmt['declarations'][0]['id']['name'] == 'tip_formular':
+                    for ajax_stmt in stmt['expression']['arguments'][0]['body']['body']:
+                        if ajax_stmt['type'] == 'ExpressionStatement' and ajax_stmt['expression']['type'] == 'CallExpression':
+                            ajax_success = ajax_stmt['expression']['arguments'][0]['properties'][5]['value']['body']['body']
+                            for success_stmt in ajax_success:
+                                if success_stmt['type'] == 'SwitchStatement' and success_stmt['discriminant']['name'] == 'tip_formular':
+                                    for case in success_stmt['cases']:
+                                        if case['test']['value'] == tip_formular_value:
+                                            for consequent in case['consequent']:
+                                                if consequent['type'] == 'VariableDeclaration' and consequent['declarations'][0]['id']['name'] == 'days_disable':
+                                                    return consequent['declarations'][0]['init']['elements']
+    return None
+
+
+async def get_disabled_days():
+    with open("programare.html") as f:
+        html = f.read()
+    soup = BeautifulSoup(html, "lxml")
+    for i in soup.find_all("script"):
+        i: Tag
+        if "#tip_formular option:selected" in i.text:
+            res = find_days_disable(i.text, '3')
+            pprint(res)
+
+
 async def main():
     # await work()
-    await get_date()
+    await get_disabled_days()
+    # await get_date(7, 3)
 
 
 if __name__ == "__main__":
