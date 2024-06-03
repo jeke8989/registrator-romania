@@ -241,7 +241,7 @@ class ProgramareCetatenie:
         )
         # Click on the finish button
         btn = page.get_by_text(re.compile("Transmite.*"))
-        await btn.click(force=True)
+        await btn.click(force=True, click_count=5)
         await asyncio.sleep(4)
         html = await page.content()
         logger.info(f"Press finish button. HTML:\n---\n{html}")
