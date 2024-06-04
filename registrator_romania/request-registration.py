@@ -147,9 +147,10 @@ async def get_date(session: aiohttp.ClientSession, disabled_days: list[datetime]
     available_dates = []
     
     for date in dates:
-        if date not in disabled_dates:
+        if date not in disabled_dates and date.weekday() not in disabled_days:
             available_dates.append(date)
     
+    pprint(available_dates)
     return available_dates
 
 
@@ -200,24 +201,6 @@ async def work(session: aiohttp.ClientSession):
     )
     print(response.text)
 
-
-def extract_days_disable(js_code):
-    parsed_code = esprima.parseScript(js_code)
-    days_disable_dict = {}
-    for node in parsed_code.body:
-        if isinstance(node, esprima.nodes.FunctionDeclaration) and node.id.name == 'success':
-            for inner_node in node.body.body:
-                if isinstance(inner_node, esprima.nodes.SwitchStatement):
-                    for case in inner_node.cases:
-                        case_value = case.test.value
-                        for consequent in case.consequent:
-                            if isinstance(consequent, esprima.nodes.VariableDeclaration):
-                                for declaration in consequent.declarations:
-                                    if declaration.id.name == 'days_disable':
-                                        days_disable_values = [element.value for element in declaration.init.elements]
-                                        days_disable_dict[case_value] = days_disable_values
-    return days_disable_dict
-
 def find_days_disable(js_code, tip_formular_value):
     parser = pyjsparser.PyJsParser()
     parsed_code = parser.parse(js_code)
@@ -225,18 +208,18 @@ def find_days_disable(js_code, tip_formular_value):
     for stmt in parsed_code['body']:
         if stmt['type'] == 'ExpressionStatement' and stmt['expression']['type'] == 'CallExpression':
             for sub_stmt in stmt['expression']['arguments'][0]['body']['body']:
-                if sub_stmt['type'] == 'VariableDeclaration' and sub_stmt['declarations'][0]['id']['name'] == 'tip_formular':
-                    for ajax_stmt in stmt['expression']['arguments'][0]['body']['body']:
-                        if ajax_stmt['type'] == 'ExpressionStatement' and ajax_stmt['expression']['type'] == 'CallExpression':
-                            ajax_success = ajax_stmt['expression']['arguments'][0]['properties'][5]['value']['body']['body']
+                if sub_stmt['type'] == 'IfStatement' and sub_stmt["consequent"]["type"] == "BlockStatement":
+                    for ajax_stmt in sub_stmt["consequent"]["body"]:
+                        if ajax_stmt['type'] == 'ExpressionStatement' and ajax_stmt['expression']['arguments'][0]["type"] == "ObjectExpression":
+                            ajax_success = ajax_stmt['expression']['arguments'][0]['properties'][6]['value']['body']['body']
                             for success_stmt in ajax_success:
                                 if success_stmt['type'] == 'SwitchStatement' and success_stmt['discriminant']['name'] == 'tip_formular':
                                     for case in success_stmt['cases']:
                                         if case['test']['value'] == tip_formular_value:
                                             for consequent in case['consequent']:
                                                 if consequent['type'] == 'VariableDeclaration' and consequent['declarations'][0]['id']['name'] == 'days_disable':
-                                                    return consequent['declarations'][0]['init']['elements']
-    return None
+                                                    return [int(obj["value"]) for obj in consequent['declarations'][0]['init']['elements']]
+    return []
 
 
 async def get_disabled_days():
@@ -246,14 +229,13 @@ async def get_disabled_days():
     for i in soup.find_all("script"):
         i: Tag
         if "#tip_formular option:selected" in i.text:
-            res = find_days_disable(i.text, '3')
-            pprint(res)
+            return find_days_disable(i.text, '3')
 
 
 async def main():
     # await work()
-    await get_disabled_days()
-    # await get_date(7, 3)
+    ddays = await get_disabled_days()
+    await get_date(ddays, 7, 3)
 
 
 if __name__ == "__main__":
