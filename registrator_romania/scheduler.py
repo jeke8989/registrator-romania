@@ -1,10 +1,10 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from loguru import logger
 
-from registrator_romania.browser import main
+from registrator_romania.request_registration import main
 
 
 async def start_scheduler(**kwargs) -> None:
@@ -13,5 +13,5 @@ async def start_scheduler(**kwargs) -> None:
     scheduler.add_job(main, "cron", max_instances=1, **kwargs)
     scheduler.start()
     dt = datetime.now()
-    logger.info(f"Start scheduler. Date is {dt}")
+    logger.info(f"Started scheduler. Datetime is {dt}")
     logging.getLogger("apscheduler").setLevel(logging.INFO)

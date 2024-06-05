@@ -1,7 +1,7 @@
 import asyncio
-import os
-import subprocess
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+
+from zoneinfo import ZoneInfo
 
 from registrator_romania.scheduler import start_scheduler
 
@@ -14,21 +14,9 @@ async def keep_running() -> None:
 
 async def main() -> None:
     """Entrypoint."""
-    process = None
-    
-    if "DISPLAY" not in os.environ:
-        os.environ["DISPLAY"] = ":99"
-        process = subprocess.Popen(
-            ["Xvfb", ":99", "-screen", "0", "1024x768x16"]
-        )
-    
     dt = datetime.now() + timedelta(seconds=10)
-    await start_scheduler(hour=dt.hour, minute=dt.minute, second=dt.second)
+    await start_scheduler(hour=8, minute=50, timezone=ZoneInfo("Europe/Moscow"))
     await keep_running()
-    
-    if process:
-        process.kill()
-
 
 
 if __name__ == "__main__":
