@@ -429,7 +429,7 @@ URL_FREE_PLACES = "https://programarecetatenie.eu/status_zii"
 async def main():
     year = 2024
     month = 10
-    day = 3
+    day = 7
     tip_formular = 4
     logger.info(
         "year month date and tip_formular is - "
@@ -463,7 +463,6 @@ async def main():
         tip_formular, date(year=year, month=month, day=day)
     )
 
-    attempts = 0
     logger.info("Start job for check if datetime are free for appointment")
     while True:
         free_places = await req.get_free_places_count_on_date(
@@ -472,15 +471,10 @@ async def main():
         is_busy = free_places is None
         logger.info(f"Is busy - {is_busy}. Free places - {free_places}")
 
-        attempts += 1
-
         if is_busy is False:
             break
-        if attempts % 10 == 0:
-            await asyncio.sleep(random.uniform(15, 30))
-            continue
 
-        await asyncio.sleep(random.uniform(5, 15))
+        await asyncio.sleep(random.uniform(0,5, 1))
 
     logger.info(
         f"Try to make an appointments. General count of users - {len(data)}"

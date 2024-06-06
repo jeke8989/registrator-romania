@@ -15,7 +15,9 @@ async def keep_running() -> None:
 async def main() -> None:
     """Entrypoint."""
     dt = datetime.now() + timedelta(seconds=10)
-    await start_scheduler(hour=8, minute=50, timezone=ZoneInfo("Europe/Moscow"))
+    await start_scheduler(
+        hour=8, minute=59, seconds=30, timezone=ZoneInfo("Europe/Moscow")
+    )
     await keep_running()
 
 
