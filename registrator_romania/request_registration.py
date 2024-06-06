@@ -8,6 +8,7 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Literal, Optional, Self
 
+import aiofiles
 import aiohttp
 import pyjsparser
 import ua_generator
@@ -289,7 +290,10 @@ class RequestsRegistrator:
             return min(free_dates)
 
         if mode == "random":
-            return random.choice(free_dates)
+            try:
+                return random.choice(free_dates)
+            except (IndexError, KeyError):
+                return []
 
         if mode == "freest":
             tasks = [
@@ -385,7 +389,7 @@ class RequestsRegistrator:
     async def registrate(
         self,
         users_data: list[dict],
-    ) -> list[str]:
+    ) -> list[tuple[str, dict]]:
         """Entrypoint of class, please use with `async with` stmt.
 
         Parameters
@@ -395,12 +399,15 @@ class RequestsRegistrator:
 
         Returns
         -------
-        list[str]
-            list with respone html.
+        list[tuple[str, dict]]
+            list with respone html and user data.
         """
 
         async def send_request(user_data: dict):
-            return await self.send_registration_request(user_data=user_data)
+            return (
+                await self.send_registration_request(user_data=user_data),
+                user_data,
+            )
 
         tasks = [send_request(user_data=user_data) for user_data in users_data]
         return await asyncio.gather(*tasks, return_exceptions=True)
@@ -431,6 +438,7 @@ async def main():
     month = 10
     day = 7
     tip_formular = 4
+    
     logger.info(
         "year month date and tip_formular is - "
         f"{year}.{month}.{day} and {tip_formular}."
@@ -475,6 +483,10 @@ async def main():
             break
 
         await asyncio.sleep(random.uniform(0,5, 1))
+        
+        dt = datetime.now()
+        if dt.hour == 9 and dt.minute == 1:
+            return
 
     logger.info(
         f"Try to make an appointments. General count of users - {len(data)}"
@@ -482,24 +494,23 @@ async def main():
     async with RequestsRegistrator(
         tip_formular,
         registration_date=date(year=year, month=month, day=day),
-        # mode_to_get_registration_date="random",
-        # month_to_get_registration_date=month,
-        # year_to_get_registration_date=year,
     ) as req:
         results = await req.registrate(users_data=data)
 
-        for i, html in enumerate(results, 1):
+        for html, user_data in results:
             if not isinstance(html, str):
                 continue
 
-            with open(f"user_{i}.html", "w") as f:
-                f.write(html)
+            name = user_data["Nume Pasaport"]
+
+            async with aiofiles.open(f"user_{name}.html", "w") as f:
+                await f.write(html)
 
             msg = "successfully" if req.is_success(html) else "failed"
 
             log_msg = (
-                f"registration for {i} user was {msg}\n---\n"
-                f"not places for date {day}/{month}/{year} is "
+                f"registration for {name} user was "
+                f"{msg}\n---\nnot places for date {day}/{month}/{year} is "
                 f"{req.is_busy(html)}\n---\n"
             )
             logger.info(log_msg)
