@@ -3,6 +3,9 @@ from datetime import datetime, timedelta
 
 from zoneinfo import ZoneInfo
 
+from loguru import logger
+
+from registrator_romania.bot import send_msg_into_chat
 from registrator_romania.scheduler import start_scheduler
 
 
@@ -15,8 +18,9 @@ async def keep_running() -> None:
 async def main() -> None:
     """Entrypoint."""
     dt = datetime.now() + timedelta(seconds=10)
+    logger.add(send_msg_into_chat, level="INFO")
     await start_scheduler(
-        hour=8, minute=59, seconds=30, timezone=ZoneInfo("Europe/Moscow")
+        hour=8, minute=59, second=30, timezone=ZoneInfo("Europe/Moscow")
     )
     await keep_running()
 
