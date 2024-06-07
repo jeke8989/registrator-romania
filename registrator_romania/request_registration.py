@@ -482,7 +482,7 @@ async def main():
         if is_busy is False:
             break
 
-        await asyncio.sleep(random.uniform(0,5, 1))
+        await asyncio.sleep(random.uniform(0.5, 1))
         
         dt = datetime.now()
         if dt.hour == 9 and dt.minute == 1:
@@ -496,8 +496,21 @@ async def main():
         registration_date=date(year=year, month=month, day=day),
     ) as req:
         results = await req.registrate(users_data=data)
-
-        for html, user_data in results:
+        logger.info(f"Results after attempt registration - {results}")
+        
+        for result in results:
+            index = results.index(result)
+            
+            log_msg = f"{index} result - {result}."
+            
+            if not isinstance(result, tuple):
+                log_msg += " Continue"
+                logger.info(log_msg)
+                continue
+            
+            logger.info(log_msg)
+            html, user_data = result
+            
             if not isinstance(html, str):
                 continue
 

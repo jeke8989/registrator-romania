@@ -31,11 +31,11 @@ async def get_df() -> DataFrame:
         "https://docs.google.com/spreadsheets/d/1ZdSqEGjV1L3Chj2a7eFc7YDcqoU16-A-RwTrpaVBfNs/edit#gid=0"
     )
     logger.info("try to get sheet")
-    # sheet1 = await sheet.get_sheet1()
-    # logger.info("try to get records")
-    # table_data = await sheet1.get_all_records()
-    with open("spr.json") as f:
-        table_data = json.load(f)
+    sheet1 = await sheet.get_sheet1()
+    logger.info("try to get records")
+    table_data = await sheet1.get_all_records()
+    # with open("spr.json") as f:
+    #     table_data = json.load(f)
     return DataFrame(table_data)
 
 
