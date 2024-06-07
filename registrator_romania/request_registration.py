@@ -436,7 +436,7 @@ URL_FREE_PLACES = "https://programarecetatenie.eu/status_zii"
 async def main():
     year = 2024
     month = 10
-    day = 7
+    day = 8
     tip_formular = 4
     
     logger.info(
