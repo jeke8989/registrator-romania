@@ -2,10 +2,11 @@ import asyncio
 import json
 
 import gspread_asyncio
-from config import get_config
 from google.oauth2.service_account import Credentials
 from loguru import logger
 from pandas import DataFrame
+
+from registrator_romania.config import get_config
 
 
 def get_creds() -> Credentials:

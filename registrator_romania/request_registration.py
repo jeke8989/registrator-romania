@@ -436,7 +436,7 @@ URL_FREE_PLACES = "https://programarecetatenie.eu/status_zii"
 async def main():
     year = 2024
     month = 10
-    day = 8
+    day = 9
     tip_formular = 4
     
     logger.info(
@@ -495,38 +495,42 @@ async def main():
         tip_formular,
         registration_date=date(year=year, month=month, day=day),
     ) as req:
-        results = await req.registrate(users_data=data)
-        logger.info(f"Results after attempt registration - {results}")
         
-        for result in results:
-            index = results.index(result)
-            
-            log_msg = f"{index} result - {result}."
-            
-            if not isinstance(result, tuple):
-                log_msg += " Continue"
+        try:
+            results = await req.registrate(users_data=data)
+            logger.info(f"Results after attempt registration - {results}")
+            for result in results:
+                index = results.index(result)
+                
+                log_msg = f"{index} result - {result}."
+                
+                if not isinstance(result, tuple):
+                    log_msg += " Continue"
+                    logger.info(log_msg)
+                    continue
+                
                 logger.info(log_msg)
-                continue
-            
-            logger.info(log_msg)
-            html, user_data = result
-            
-            if not isinstance(html, str):
-                continue
+                html, user_data = result
+                
+                if not isinstance(html, str):
+                    continue
 
-            name = user_data["Nume Pasaport"]
+                name = user_data["Nume Pasaport"]
 
-            async with aiofiles.open(f"user_{name}.html", "w") as f:
-                await f.write(html)
+                async with aiofiles.open(f"user_{name}.html", "w") as f:
+                    await f.write(html)
 
-            msg = "successfully" if req.is_success(html) else "failed"
+                msg = "successfully" if req.is_success(html) else "failed"
 
-            log_msg = (
-                f"registration for {name} user was "
-                f"{msg}\n---\nnot places for date {day}/{month}/{year} is "
-                f"{req.is_busy(html)}\n---\n"
-            )
-            logger.info(log_msg)
+                log_msg = (
+                    f"registration for {name} user was "
+                    f"{msg}\n---\nnot places for date {day}/{month}/{year} is "
+                    f"{req.is_busy(html)}\n---\n"
+                )
+                logger.info(log_msg)
+
+        except Exception as e:
+            logger.exception(e)
 
 
 if __name__ == "__main__":
