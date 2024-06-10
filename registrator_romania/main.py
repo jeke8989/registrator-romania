@@ -25,7 +25,7 @@ async def main() -> None:
     #     timezone=ZoneInfo("Europe/Moscow"),
     # )
     await start_scheduler(
-        hour=8, minute=59, second=30, timezone=ZoneInfo("Europe/Moscow")
+        hour=8, minute=59, second=0, timezone=ZoneInfo("Europe/Moscow")
     )
     await keep_running()
 

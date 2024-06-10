@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import random
-import string
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Literal, Optional, Self
@@ -15,6 +14,7 @@ import ua_generator
 from bs4 import BeautifulSoup, Tag
 from loguru import logger
 from pypasser import reCaptchaV3
+from zoneinfo import ZoneInfo
 
 from registrator_romania.google_spread import get_df
 from registrator_romania.proxy import aiohttp_session
@@ -216,7 +216,7 @@ class RequestsRegistrator:
         form.add_field("azi", dt.strftime("%Y-%m-%d"))
         form.add_field("tip_formular", str(tip_formular))
 
-        @aiohttp_session()
+        @aiohttp_session(timeout=1.5, attempts=3, sleeps=(1.5, 2))
         async def inner(session: aiohttp.ClientSession):
             session._default_headers = self.headers
             async with session.post(URL_FREE_PLACES, data=form) as resp:
@@ -435,37 +435,16 @@ URL_FREE_PLACES = "https://programarecetatenie.eu/status_zii"
 
 async def main():
     year = 2024
-    month = 10
-    day = 9
-    tip_formular = 4
-    
+    month = 7
+    day = 31
+    tip_formular = 3
+
     logger.info(
         "year month date and tip_formular is - "
         f"{year}.{month}.{day} and {tip_formular}."
     )
-
-    def random_str(n: int = 15):
-        return "".join(random.choices(string.ascii_uppercase, k=n))
-
-    fake_data = [
-        {
-            "tip_formular": tip_formular,
-            "Nume Pasaport": f"Danii{random_str(2)}",
-            "Data Nasterii": date(year=2000, month=5, day=2).strftime(
-                "%Y-%m-%d"
-            ),
-            "Prenume Pasaport": f"Iog{random_str(3)}",
-            "Locul Nasterii": random_str(4),
-            "Prenume Mama": f"Irin{random_str(1)}",
-            "Prenume Tata": f"Ste{random_str(3)}",
-            "email": f"{random_str(7)}@gmail.com",
-            "Serie și număr Pașaport": random_str(10),
-        }
-        for _ in range(5)
-    ]
-
-    users_data = (await get_df()).to_dict("records")
-    data = users_data.copy()
+    users_data = await get_df()
+    data = users_data.to_dict("records")
 
     req = RequestsRegistrator(
         tip_formular, date(year=year, month=month, day=day)
@@ -473,9 +452,16 @@ async def main():
 
     logger.info("Start job for check if datetime are free for appointment")
     while True:
-        free_places = await req.get_free_places_count_on_date(
-            datetime(year, month, day), tip_formular
-        )
+        free_places = None
+        try:
+            free_places = await req.get_free_places_count_on_date(
+                datetime(year, month, day), tip_formular
+            )
+        except asyncio.TimeoutError:
+            continue
+        except Exception as e:
+            logger.exception(e)
+
         is_busy = free_places is None
         logger.info(f"Is busy - {is_busy}. Free places - {free_places}")
 
@@ -483,8 +469,8 @@ async def main():
             break
 
         await asyncio.sleep(random.uniform(0.5, 1))
-        
-        dt = datetime.now()
+
+        dt = datetime.now().astimezone(ZoneInfo("Europe/Moscow"))
         if dt.hour == 9 and dt.minute == 1:
             return
 
@@ -495,23 +481,22 @@ async def main():
         tip_formular,
         registration_date=date(year=year, month=month, day=day),
     ) as req:
-        
         try:
             results = await req.registrate(users_data=data)
             logger.info(f"Results after attempt registration - {results}")
             for result in results:
                 index = results.index(result)
-                
+
                 log_msg = f"{index} result - {result}."
-                
+
                 if not isinstance(result, tuple):
                     log_msg += " Continue"
                     logger.info(log_msg)
                     continue
-                
+
                 logger.info(log_msg)
                 html, user_data = result
-                
+
                 if not isinstance(html, str):
                     continue
 
