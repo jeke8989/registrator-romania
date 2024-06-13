@@ -5,11 +5,13 @@ import json
 import random
 from calendar import calendar, monthrange
 from datetime import date, datetime, timedelta
+import re
 from typing import Literal, Optional, Self
 
 import aiofiles
 import aiohttp
 import pyjsparser
+import requests
 import ua_generator
 from bs4 import BeautifulSoup, Tag
 from loguru import logger
@@ -516,20 +518,22 @@ async def registrate(dt: datetime, tip_formular: int = 3):
                 break
 
 
-async def main():
+@aiohttp_session()
+async def main(session: aiohttp.ClientSession):
     year = 2024
     month = 10
-    day = 14
-    tip_formular = 3
+    day = datetime.now().astimezone(ZoneInfo("Europe/Moscow")).day
+    async with session.get(SITE_URL) as resp:
+        soup = BeautifulSoup(await resp.text(), "lxml")
 
-    results = await asyncio.gather(
-        *[
-            registrate(
-                datetime(year=year, month=month, day=day), tip_formular
-            )
-            for day in range(10, 11)
-        ],
-        return_exceptions=False,
+    tip_formular = int(
+        soup.find("select", id="tip_formular").find(
+            "option", string=re.compile(".*ART.* 10")
+        )["value"]
+    )
+
+    results = await registrate(
+        datetime(year=year, month=month, day=day), tip_formular
     )
     logger.info(f"Results: {results}")
 
