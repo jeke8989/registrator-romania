@@ -460,13 +460,15 @@ async def registrate(dt: datetime, tip_formular: int = 3):
         is_busy = free_places is None
 
         if is_busy is False:
-            logger.info(f"script found free places for date: {dt}")
+            logger.info(
+                f"script found {free_places} free places for date: {dt}"
+            )
             break
 
         await asyncio.sleep(random.uniform(0.5, 1))
 
-        dt = datetime.now().astimezone(ZoneInfo("Europe/Moscow"))
-        if dt.hour == 9 and dt.minute == 2:
+        dt_now = datetime.now().astimezone(ZoneInfo("Europe/Moscow"))
+        if dt_now.hour == 9 and dt_now.minute >= 2:
             return
 
     logger.info(
@@ -477,15 +479,16 @@ async def registrate(dt: datetime, tip_formular: int = 3):
         registration_date=dt,
     ) as req:
         while True:
+            dt_now = datetime.now().astimezone(ZoneInfo("Europe/Moscow"))
             try:
                 results = await req.registrate(users_data=data)
-                logger.info(f"Results after attempt registration - {results}")
+                logger.info(f"Results after trying to register - {results}")
                 for result in results:
                     index = results.index(result)
 
                     log_msg = (
-                        f"{index} attempt result out of "
-                        f"{len(results)} {result}."
+                        f"{index + 1} attempt result out of "
+                        f"{len(results)}: {result}."
                     )
 
                     if not isinstance(result, tuple):
@@ -504,8 +507,9 @@ async def registrate(dt: datetime, tip_formular: int = 3):
 
                     log_msg = (
                         f"registration for {name} user was "
-                        f"{msg}\n---\nnot places for date {dt.day}/{dt.month}/{dt.year} is "
-                        f"{req.is_busy(html)}\n---\n"
+                        f"{msg}\n---\nnot places for date {dt.day}/{dt.month}"
+                        f"/{dt.year} is {req.is_busy(html)}\n---\n---"
+                        f"tip formular is {tip_formular}\n---"
                     )
                     logger.info(log_msg)
 
@@ -516,6 +520,9 @@ async def registrate(dt: datetime, tip_formular: int = 3):
                 logger.exception(e)
             else:
                 break
+            finally:
+                if dt_now.hour == 9 and dt_now.minute >= 2:
+                    break
 
 
 @aiohttp_session()
@@ -523,14 +530,18 @@ async def main(session: aiohttp.ClientSession):
     year = 2024
     month = 10
     day = datetime.now().astimezone(ZoneInfo("Europe/Moscow")).day
-    async with session.get(SITE_URL) as resp:
-        soup = BeautifulSoup(await resp.text(), "lxml")
+    try:
+        async with session.get(SITE_URL) as resp:
+            soup = BeautifulSoup(await resp.text(), "lxml")
 
-    tip_formular = int(
-        soup.find("select", id="tip_formular").find(
-            "option", string=re.compile(".*ART.* 10")
-        )["value"]
-    )
+        tip_formular = int(
+            soup.find("select", id="tip_formular").find(
+                "option", string=re.compile(".*ART.* 10")
+            )["value"]
+        )
+    except Exception as e:
+        logger.exception(e)
+        tip_formular = 4
 
     results = await registrate(
         datetime(year=year, month=month, day=day), tip_formular
