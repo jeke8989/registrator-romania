@@ -4,9 +4,11 @@ import asyncio
 import json
 import random
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
+from venv import logger
 
 import aiohttp
+from aiohttp_socks import ProxyConnector
 from fake_useragent import UserAgent
 
 if TYPE_CHECKING:
@@ -45,3 +47,26 @@ def aiohttp_session(
         return inner
 
     return wrapper
+
+
+@aiohttp_session(timeout=7)
+async def get_proxies(session: aiohttp.ClientSession) -> List[str]:
+    key = "8170de9bb395804d366354100e99271b"
+    url = (
+        "http://api.best-proxies.ru/proxylist.txt?"
+        f"key={key}&includeType=1&type=http&type=https&level=1"
+    )
+    async with session.get(url) as resp:
+        response = await resp.text()
+        return response.splitlines()
+
+
+@aiohttp_session(timeout=7, attempts=3)
+async def check_proxy(session: aiohttp.ClientSession, proxy: str) -> dict:
+    url = "https://api.ipify.org?format=json"
+    try:
+        async with session.get(url, proxy=proxy) as resp:
+            return await resp.json()
+    except Exception as e:
+        logger.exception(e)
+        return {}

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 
 import gspread_asyncio
 from google.oauth2.service_account import Credentials
@@ -22,21 +23,30 @@ def get_creds() -> Credentials:
     )
 
 
-async def get_df() -> DataFrame:
+async def get_df(from_json: bool = False) -> DataFrame:
     """Get DataFrame of users (very good api for work with .csv)."""
     manager = gspread_asyncio.AsyncioGspreadClientManager(get_creds)
-    logger.info("try to authorizate in gsheets")
-    agc = await manager.authorize()
-    logger.info("try to open by url")
-    sheet = await agc.open_by_url(
-        "https://docs.google.com/spreadsheets/d/1ZdSqEGjV1L3Chj2a7eFc7YDcqoU16-A-RwTrpaVBfNs/edit#gid=0"
-    )
-    logger.info("try to get sheet")
-    sheet1 = await sheet.get_sheet1()
-    logger.info("try to get records")
-    table_data = await sheet1.get_all_records()
-    # with open("spr.json") as f:
-    #     table_data = json.load(f)
+    if from_json and not os.path.exists("spr.json"):
+        from_json = False
+        
+    if not from_json:
+        logger.info("try to authorizate in gsheets")
+        agc = await manager.authorize()
+        logger.info("try to open by url")
+        sheet = await agc.open_by_url(
+            "https://docs.google.com/spreadsheets/d/1ZdSqEGjV1L3Chj2a7eFc7YDcqoU16-A-RwTrpaVBfNs/edit#gid=0"
+        )
+        logger.info("try to get sheet")
+        sheet1 = await sheet.get_sheet1()
+        logger.info("try to get records")
+        table_data = await sheet1.get_all_records()
+        with open("spr.json", "w") as f:
+            json.dump(table_data, f)
+    else:
+        with open("spr.json") as f:
+            table_data = json.load(f)
+        logger.info("get users data from json file")
+        
     return DataFrame(table_data)
 
 

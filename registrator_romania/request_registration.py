@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import random
-from calendar import monthrange
+from calendar import calendar, monthrange
 from datetime import date, datetime, timedelta
 from typing import Literal, Optional, Self
 
@@ -433,29 +433,22 @@ URL_DATES = "https://programarecetatenie.eu/status_zile"
 URL_FREE_PLACES = "https://programarecetatenie.eu/status_zii"
 
 
-async def main():
-    year = 2024
-    month = 7
-    day = 31
-    tip_formular = 3
-
+async def registrate(dt: datetime, tip_formular: int = 3):
     logger.info(
         "year month date and tip_formular is - "
-        f"{year}.{month}.{day} and {tip_formular}."
+        f"{dt.year}.{dt.month}.{dt.day} and {tip_formular}."
     )
-    users_data = await get_df()
+    users_data = await get_df(from_json=True)
     data = users_data.to_dict("records")
 
-    req = RequestsRegistrator(
-        tip_formular, date(year=year, month=month, day=day)
-    )
+    req = RequestsRegistrator(tip_formular, dt.date())
 
     logger.info("Start job for check if datetime are free for appointment")
     while True:
         free_places = None
         try:
             free_places = await req.get_free_places_count_on_date(
-                datetime(year, month, day), tip_formular
+                dt, tip_formular
             )
         except asyncio.TimeoutError:
             continue
@@ -463,15 +456,15 @@ async def main():
             logger.exception(e)
 
         is_busy = free_places is None
-        logger.info(f"Is busy - {is_busy}. Free places - {free_places}")
 
         if is_busy is False:
+            logger.info(f"script found free places for date: {dt}")
             break
 
         await asyncio.sleep(random.uniform(0.5, 1))
 
         dt = datetime.now().astimezone(ZoneInfo("Europe/Moscow"))
-        if dt.hour == 9 and dt.minute == 1:
+        if dt.hour == 9 and dt.minute == 2:
             return
 
     logger.info(
@@ -479,43 +472,66 @@ async def main():
     )
     async with RequestsRegistrator(
         tip_formular,
-        registration_date=date(year=year, month=month, day=day),
+        registration_date=dt,
     ) as req:
-        try:
-            results = await req.registrate(users_data=data)
-            logger.info(f"Results after attempt registration - {results}")
-            for result in results:
-                index = results.index(result)
+        while True:
+            try:
+                results = await req.registrate(users_data=data)
+                logger.info(f"Results after attempt registration - {results}")
+                for result in results:
+                    index = results.index(result)
 
-                log_msg = f"{index} result - {result}."
+                    log_msg = (
+                        f"{index} attempt result out of "
+                        f"{len(results)} {result}."
+                    )
 
-                if not isinstance(result, tuple):
-                    log_msg += " Continue"
+                    if not isinstance(result, tuple):
+                        log_msg += " Continue"
+                        logger.info(log_msg)
+                        continue
+
                     logger.info(log_msg)
-                    continue
+                    html, user_data = result
 
-                logger.info(log_msg)
-                html, user_data = result
+                    if not isinstance(html, str):
+                        continue
 
-                if not isinstance(html, str):
-                    continue
+                    name = user_data["Nume Pasaport"]
+                    msg = "successfully" if req.is_success(html) else "failed"
 
-                name = user_data["Nume Pasaport"]
+                    log_msg = (
+                        f"registration for {name} user was "
+                        f"{msg}\n---\nnot places for date {dt.day}/{dt.month}/{dt.year} is "
+                        f"{req.is_busy(html)}\n---\n"
+                    )
+                    logger.info(log_msg)
 
-                async with aiofiles.open(f"user_{name}.html", "w") as f:
-                    await f.write(html)
+                    async with aiofiles.open(f"user_{name}.html", "w") as f:
+                        await f.write(html)
 
-                msg = "successfully" if req.is_success(html) else "failed"
+            except Exception as e:
+                logger.exception(e)
+            else:
+                break
 
-                log_msg = (
-                    f"registration for {name} user was "
-                    f"{msg}\n---\nnot places for date {day}/{month}/{year} is "
-                    f"{req.is_busy(html)}\n---\n"
-                )
-                logger.info(log_msg)
 
-        except Exception as e:
-            logger.exception(e)
+async def main():
+    year = 2024
+    month = 10
+    day = 14
+    tip_formular = 3
+
+    results = await asyncio.gather(
+        *[
+            registrate(
+                datetime(year=year, month=month, day=day), tip_formular
+            )
+            for day in range(10, 11)
+        ],
+        return_exceptions=False,
+    )
+    logger.info(f"Results: {results}")
 
 
 if __name__ == "__main__":
