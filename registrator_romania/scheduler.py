@@ -7,11 +7,11 @@ from loguru import logger
 from registrator_romania.request_registration import main
 
 
-async def start_scheduler(num: int, **kwargs) -> None:
+async def start_scheduler(**kwargs) -> None:
     """Run scheduler that trigger work with browser."""
     scheduler = AsyncIOScheduler()
     scheduler.add_job(main, "cron", max_instances=1, **kwargs)
     scheduler.start()
     dt = datetime.now()
-    logger.info(f"Started scheduler {num}. Datetime is {dt}")
+    logger.info(f"Started scheduler. Datetime is {dt}")
     logging.getLogger("apscheduler").setLevel(logging.INFO)

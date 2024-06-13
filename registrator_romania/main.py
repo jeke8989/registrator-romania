@@ -17,17 +17,15 @@ async def keep_running() -> None:
 
 async def main() -> None:
     """Entrypoint."""
-    logger.add(send_msg_into_chat, level="INFO")
-    [
-        await start_scheduler(
-            num=i,
-            hour=8,
-            minute=59,
-            second=0,
-            timezone=ZoneInfo("Europe/Moscow"),
-        )
-        for i in range(5)
-    ]
+    # logger.add(send_msg_into_chat, level="INFO")
+    logger.add("log_{time}.log", rotation="1 day", level="INFO")
+    await start_scheduler(
+        hour=8,
+        minute=59,
+        second=0,
+        timezone=ZoneInfo("Europe/Moscow"),
+    )
+
     await keep_running()
 
 
