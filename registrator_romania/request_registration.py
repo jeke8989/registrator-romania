@@ -435,7 +435,7 @@ URL_DATES = "https://programarecetatenie.eu/status_zile"
 URL_FREE_PLACES = "https://programarecetatenie.eu/status_zii"
 
 
-async def registrate(dt: datetime, tip_formular: int = 3):
+async def registrate(dt: datetime, tip_formular: int = 4):
     logger.info(
         "year month date and tip_formular is - "
         f"{dt.year}.{dt.month}.{dt.day} and {tip_formular}."

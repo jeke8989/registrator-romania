@@ -21,8 +21,8 @@ async def main() -> None:
     logger.add("log_{time}.log", rotation="1 day", level="INFO")
     await start_scheduler(
         hour=8,
-        minute=59,
-        second=0,
+        minute=58,
+        second=20,
         timezone=ZoneInfo("Europe/Moscow"),
     )
 
