@@ -28,7 +28,7 @@ async def get_df(from_json: bool = False) -> DataFrame:
     manager = gspread_asyncio.AsyncioGspreadClientManager(get_creds)
     if from_json and not os.path.exists("spr.json"):
         from_json = False
-        
+
     if not from_json:
         logger.info("try to authorizate in gsheets")
         agc = await manager.authorize()
@@ -40,13 +40,14 @@ async def get_df(from_json: bool = False) -> DataFrame:
         sheet1 = await sheet.get_sheet1()
         logger.info("try to get records")
         table_data = await sheet1.get_all_records()
+        table_data = [{k: v.strip() for k, v in d.items()} for d in table_data]
         with open("spr.json", "w") as f:
-            json.dump(table_data, f)
+            json.dump(table_data, f, indent=2, ensure_ascii=False)
     else:
         with open("spr.json") as f:
             table_data = json.load(f)
         logger.info("get users data from json file")
-        
+
     return DataFrame(table_data)
 
 
