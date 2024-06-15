@@ -1,6 +1,9 @@
 import asyncio
+from datetime import date
 import json
 import os
+import random
+import string
 
 import gspread_asyncio
 from google.oauth2.service_account import Credentials
@@ -21,6 +24,10 @@ def get_creds() -> Credentials:
             "https://www.googleapis.com/auth/drive",
         ]
     )
+
+
+def random_str(n: int = 15):
+    return "".join(random.choices(string.ascii_uppercase, k=n))
 
 
 async def get_df(from_json: bool = False) -> DataFrame:
@@ -44,9 +51,23 @@ async def get_df(from_json: bool = False) -> DataFrame:
         with open("spr.json", "w") as f:
             json.dump(table_data, f, indent=2, ensure_ascii=False)
     else:
-        with open("spr.json") as f:
-            table_data = json.load(f)
+        # with open("spr.json") as f:
+        #     table_data = json.load(f)
         logger.info("get users data from json file")
+        table_data = [
+            {
+                "Nume Pasaport": f"PAM{random_str(5)}",
+                "Prenume Pasaport": f"IN{random_str(5)}",
+                "Data nasterii": f"1974-0{random.randint(1, 9)}-1{random.randint(1, 10)}",
+                "Locul Nasterii": f"SILIV{random_str(5)}",
+                "Prenume Mama": f"RECEBI{random_str(5)}",
+                "Prenume Tata": f"SAB{random_str(5)}",
+                "Adresa de email": f"kadri{random_str(5)}@gmail.com",
+                "Serie și număr Pașaport": f"U{"".join([str(random.randint(1, 10)) for _ in range(8)])}",
+                "Статус записи": "",
+            }
+            for _ in range(5)
+        ]
 
     return DataFrame(table_data)
 
