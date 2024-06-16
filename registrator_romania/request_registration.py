@@ -484,19 +484,9 @@ async def registrate(dt: datetime, tip_formular: int = 4):
                 results = await req.registrate(users_data=data)
                 logger.info(f"Results after trying to register - {results}")
                 for result in results:
-                    index = results.index(result)
-
-                    log_msg = (
-                        f"{index + 1} attempt result out of "
-                        f"{len(results)}: {result}."
-                    )
-
                     if not isinstance(result, tuple):
-                        log_msg += " Continue"
-                        logger.info(log_msg)
                         continue
 
-                    logger.info(log_msg)
                     html, user_data = result
 
                     if not isinstance(html, str):

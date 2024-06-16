@@ -66,7 +66,7 @@ async def get_df(from_json: bool = False) -> DataFrame:
                 "Serie și număr Pașaport": f"U{"".join([str(random.randint(1, 10)) for _ in range(8)])}",
                 "Статус записи": "",
             }
-            for _ in range(5)
+            for _ in range(10)
         ]
 
     return DataFrame(table_data)
