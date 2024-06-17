@@ -56,18 +56,40 @@ async def get_df(from_json: bool = False) -> DataFrame:
         logger.info("get users data from json file")
         table_data = [
             {
-                "Nume Pasaport": f"PAM{random_str(5)}",
-                "Prenume Pasaport": f"IN{random_str(5)}",
-                "Data nasterii": f"1974-0{random.randint(1, 9)}-1{random.randint(1, 10)}",
-                "Locul Nasterii": f"SILIV{random_str(5)}",
-                "Prenume Mama": f"RECEBI{random_str(5)}",
-                "Prenume Tata": f"SAB{random_str(5)}",
-                "Adresa de email": f"kadri{random_str(5)}@gmail.com",
-                "Serie și număr Pașaport": f"U{"".join([str(random.randint(1, 10)) for _ in range(8)])}",
-                "Статус записи": "",
-            }
-            for _ in range(10)
+                "Nume": "PAMIR",
+                "Prenume": "KADRI",
+                "Data naşterii": "21/10/1984",
+                "Locul naşterii": "SILIVRI",
+                "Prenumele mamei": "RECEBIYE",
+                "Prenumele tatalui": "SABRI",
+                "Adresa de e-mail": "pamirkadri1@gmail.com",
+                "Seria şi numar Paşaport": "U32965790",
+            },
+            {
+                "Nume": "RAMIL",
+                "Prenume": "KUNAN",
+                "Data naşterii": "20/12/1986",
+                "Locul naşterii": "SILIVRI",
+                "Prenumele mamei": "RECEBIYE",
+                "Prenumele tatalui": "SABRI",
+                "Adresa de e-mail": "ramilkunan1@gmail.com",
+                "Seria şi numar Paşaport": "S20769456",
+            },
         ]
+        # table_data = [
+        #     {
+        #         "Nume Pasaport": f"PAM{random_str(5)}",
+        #         "Prenume Pasaport": f"IN{random_str(5)}",
+        #         "Data nasterii": f"1974-0{random.randint(1, 9)}-1{random.randint(1, 10)}",
+        #         "Locul Nasterii": f"SILIV{random_str(5)}",
+        #         "Prenume Mama": f"RECEBI{random_str(5)}",
+        #         "Prenume Tata": f"SAB{random_str(5)}",
+        #         "Adresa de email": f"kadri{random_str(5)}@gmail.com",
+        #         "Serie și număr Pașaport": f"U{"".join([str(random.randint(1, 10)) for _ in range(8)])}",
+        #         "Статус записи": "",
+        #     }
+        #     for _ in range(10)
+        # ]
 
     return DataFrame(table_data)
 

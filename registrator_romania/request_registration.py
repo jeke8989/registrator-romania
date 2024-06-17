@@ -330,6 +330,7 @@ class RequestsRegistrator:
             "honeypot": "",
             "g-recaptcha-response": await self.get_captcha_response(),
         }
+        logger.info(f"Payload for registrate user {user_data} is {data}")
 
         @aiohttp_session()
         async def inner(session: aiohttp.ClientSession):
