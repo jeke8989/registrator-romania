@@ -4,7 +4,7 @@ from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from loguru import logger
 
-from registrator_romania.request_registration import main
+from registrator_romania.new_request_registrator import main
 
 
 async def start_scheduler(**kwargs) -> None:
