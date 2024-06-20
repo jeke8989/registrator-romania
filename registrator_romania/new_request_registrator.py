@@ -99,13 +99,9 @@ async def registrate(users_data: list[dict], tip_formular: int, reg_dt: date):
     # }
 
     @aiohttp_session()
-    async def reg(session: aiohttp.ClientSession, data: dict):
+    async def reg(session: aiohttp.ClientSession, user_data: dict):
         session._default_headers = get_headers()
-        async with session.post(URL_GENERAL, data=data) as resp:
-            return (await resp.text(), user_data)
-
-    tasks = []
-    for user_data in users_data:
+        
         data = {
             "tip_formular": tip_formular,
             "nume_pasaport": user_data["Nume Pasaport"].strip(),
@@ -121,7 +117,13 @@ async def registrate(users_data: list[dict], tip_formular: int, reg_dt: date):
             "honeypot": "",
             "g-recaptcha-response": await get_captcha_response(),
         }
-        tasks.append(reg(data))
+
+        async with session.post(URL_GENERAL, data=data) as resp:
+            return (await resp.text(), user_data)
+
+    tasks = []
+    for user_data in users_data:
+        tasks.append(reg(user_data))
 
     return await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -151,23 +153,42 @@ def is_busy(html_code: str) -> bool:
 
 async def main():
     dt_now = get_dt()
-    dt = date(dt_now.year, 10, dt_now.day)
-    # dt = date(dt_now.year, 10, 17)
+    # dt = date(dt_now.year, 10, dt_now.day)
+    dt = date(dt_now.year, 10, 17)
 
     # 4 - articolul 10. 3 for artcolul 11
-    tip_formular = 4
+    tip_formular = 3
     users_data = [
         {
-            "Nume Pasaport": "PAMIR",
-            "Prenume Pasaport": "KADRI",
-            "Data nasterii": "1984-10-21",
-            "Locul naşterii": "SILIVRI",
-            "Prenume Mama": "RECEBIYE",
-            "Prenume Tata": "SABRI",
+            "Nume Pasaport": nume,
+            "Prenume Pasaport": prenume,
+            "Data nasterii": bdt,
+            "Locul naşterii": locul,
+            "Prenume Mama": mama,
+            "Prenume Tata": tata,
             "Adresa de email": f"{"".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))}@gmail.com",
-            "Serie și număr Pașaport": "U32965790",
+            "Serie și număr Pașaport": pspt,
         }
-        for _ in [1, 2]
+        for nume, prenume, bdt, locul, mama, tata, pspt in [
+            [
+                "PAMIR",
+                "KADRI",
+                "1984-10-21",
+                "SILIVRI",
+                "RECEBIYE",
+                "SABRI",
+                "U32965790",
+            ],
+            [
+                "RAMIL",
+                "KUNAN",
+                "1986-5-15",
+                "SILIVRI",
+                "RECEBYE",
+                "SABRI",
+                "S20769456",
+            ],
+        ]
     ]
 
     while True:
@@ -221,8 +242,14 @@ async def main():
                 async with aiofiles.open(f"user_{name}.html", "w") as f:
                     await f.write(html)
 
+                if is_success(html) is False:
+                    raise Exception
+
         except Exception as e:
             logger.exception(e)
+
+        else:
+            return
 
 
 if __name__ == "__main__":
