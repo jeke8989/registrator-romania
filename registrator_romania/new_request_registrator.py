@@ -153,11 +153,11 @@ def is_busy(html_code: str) -> bool:
 
 async def main():
     dt_now = get_dt()
-    # dt = date(dt_now.year, 10, dt_now.day)
-    dt = date(dt_now.year, 10, 17)
+    dt = date(dt_now.year, 10, dt_now.day)
+    # dt = date(dt_now.year, 10, 17)
 
     # 4 - articolul 10. 3 for artcolul 11
-    tip_formular = 3
+    tip_formular = 4
     users_data = [
         {
             "Nume Pasaport": nume,
