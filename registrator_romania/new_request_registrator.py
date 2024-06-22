@@ -158,37 +158,45 @@ async def main():
 
     # 4 - articolul 10. 3 for artcolul 11
     tip_formular = 4
+
+    def random_string(n: int = 5):
+        return "".join(
+            random.choice(string.ascii_uppercase + string.digits)
+            for _ in range(n)
+        )
+
     users_data = [
         {
-            "Nume Pasaport": nume,
-            "Prenume Pasaport": prenume,
-            "Data nasterii": bdt,
-            "Locul naşterii": locul,
-            "Prenume Mama": mama,
-            "Prenume Tata": tata,
-            "Adresa de email": f"{"".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))}@gmail.com",
-            "Serie și număr Pașaport": pspt,
+            "Nume Pasaport": f"P{random_string(5)}IR",
+            "Prenume Pasaport": f"{random_string(7)}DRI",
+            "Data nasterii": f"199{random.randint(0, 9)}-10-1{random.randint(0, 9)}",
+            "Locul naşterii": f"SI{random_string(3)}RI",
+            "Prenume Mama": f"REC{random_string(3)}YE",
+            "Prenume Tata": "SABRI",
+            "Adresa de email": f"{"".join(random.choice(string.ascii_uppercase) for _ in range(10))}@gmail.com",
+            "Serie și număr Pașaport": f"U{random.randint(10_000_000, 10_999_999)}",
         }
-        for nume, prenume, bdt, locul, mama, tata, pspt in [
-            [
-                "PAMIR",
-                "KADRI",
-                "1984-10-21",
-                "SILIVRI",
-                "RECEBIYE",
-                "SABRI",
-                "U32965790",
-            ],
-            [
-                "RAMIL",
-                "KUNAN",
-                "1986-5-15",
-                "SILIVRI",
-                "RECEBYE",
-                "SABRI",
-                "S20769456",
-            ],
-        ]
+        for _ in range(40)
+        # for nume, prenume, bdt, locul, mama, tata, pspt in [
+        #     [
+        #         "PAMIR",
+        #         "KADRI",
+        #         "1984-10-21",
+        #         "SILIVRI",
+        #         "RECEBIYE",
+        #         "SABRI",
+        #         "U32965790",
+        #     ],
+        #     [
+        #         "RAMIL",
+        #         "KUNAN",
+        #         "1986-5-15",
+        #         "SILIVRI",
+        #         "RECEBYE",
+        #         "SABRI",
+        #         "S20769456",
+        #     ],
+        # ]
     ]
 
     while True:
