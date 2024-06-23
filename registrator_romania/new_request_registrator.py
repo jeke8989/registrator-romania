@@ -151,6 +151,31 @@ def is_busy(html_code: str) -> bool:
     return False
 
 
+def get_users_data():
+    keys = [
+        "Prenume Pasaport",
+        "Nume Pasaport",
+        "Data nasterii",
+        "Locul naşterii",
+        "Prenume Mama",
+        "Prenume Tata",
+        "Adresa de email",
+        "Serie și număr Pașaport",
+    ]
+    with open("users.txt") as f:
+        data = f.read()
+
+    objs = []
+    for values in data.split("\n\n"):
+        obj = {}
+        for k, v in zip(keys, values.split("\n")):
+            obj[k] = v.split(":")[-1].strip()
+        obj["Adresa de email"] = obj["Adresa de email"].lower()
+        objs.append(obj)
+
+    return objs
+
+
 async def main():
     dt_now = get_dt()
     dt = date(dt_now.year, 10, dt_now.day)
@@ -198,6 +223,7 @@ async def main():
         #     ],
         # ]
     ]
+    users_data = get_users_data()
 
     while True:
         try:
