@@ -277,13 +277,17 @@ async def main():
                     await f.write(html)
 
                 if is_success(html) is False:
-                    raise Exception
-
-        except Exception as e:
-            logger.exception(e)
-
+                    logger.error(f"\n{html}\n")
+        
+        except:
+            pass
+        
         else:
             return
+
+        finally:
+            if dt_now.hour == 9 and dt_now.minute >= 1:
+                return
 
 
 if __name__ == "__main__":
