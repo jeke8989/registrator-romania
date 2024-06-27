@@ -101,7 +101,7 @@ async def registrate(users_data: list[dict], tip_formular: int, reg_dt: date):
     @aiohttp_session()
     async def reg(session: aiohttp.ClientSession, user_data: dict):
         session._default_headers = get_headers()
-        
+
         data = {
             "tip_formular": tip_formular,
             "nume_pasaport": user_data["Nume Pasaport"].strip(),
@@ -169,7 +169,16 @@ def get_users_data():
     for values in data.split("\n\n"):
         obj = {}
         for k, v in zip(keys, values.split("\n")):
-            obj[k] = v.split(":")[-1].strip()
+            v = v.split(":")[-1].strip()
+
+            if k == "Data nasterii":
+                try:
+                    dt = datetime.strptime(v, "%Y-%m-%d")
+                except Exception:
+                    dt = datetime.strptime(v, "%d-%m-%Y")
+                v = dt.strftime("%Y-%m-%d")
+
+            obj[k] = v
         obj["Adresa de email"] = obj["Adresa de email"].lower()
         objs.append(obj)
 
@@ -277,11 +286,13 @@ async def main():
                     await f.write(html)
 
                 if is_success(html) is False:
-                    logger.error(f"\n{html}\n")
-        
-        except:
-            pass
-        
+                    raise TypeError(f"Registration for {name} was failed")
+
+        except Exception as e:
+            if str(e).count("Registration for "):
+                continue
+            logger.exception(e)
+
         else:
             return
 
