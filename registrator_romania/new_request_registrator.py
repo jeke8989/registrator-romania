@@ -270,6 +270,7 @@ async def main():
 
     while True:
         dt_now = get_dt()
+        error = 0
         try:
             results = await registrate(users_data, tip_formular, dt)
 
@@ -298,16 +299,16 @@ async def main():
 
                 if is_success(html) is False:
                     logger.error(f"Registration for {name} was failed")
+                    error += 1
 
         except Exception as e:
             logger.exception(e)
 
-        else:
-            return
-
         finally:
             if dt_now.hour == 9 and dt_now.minute >= 1:
                 return
+            if error:
+                continue
 
 
 if __name__ == "__main__":
