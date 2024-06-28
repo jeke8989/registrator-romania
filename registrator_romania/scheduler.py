@@ -10,7 +10,7 @@ from registrator_romania.new_request_registrator import main
 async def start_scheduler(**kwargs) -> None:
     """Run scheduler that trigger work with browser."""
     scheduler = AsyncIOScheduler()
-    await main()
+    # await main()
     scheduler.add_job(main, "cron", max_instances=1, **kwargs)
     scheduler.start()
     dt = datetime.now()
