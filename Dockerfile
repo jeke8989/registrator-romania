@@ -10,9 +10,4 @@ RUN poetry install --no-root --no-interaction --no-ansi
 
 COPY . /app
 
-RUN apt update -y
-RUN apt install xvfb -y
-RUN playwright install-deps
-RUN playwright install chromium
-
 ENTRYPOINT [ "python", "registrator_romania/main.py" ]

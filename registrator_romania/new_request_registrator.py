@@ -7,11 +7,13 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 import aiofiles
+import bs4
 from loguru import logger
 import ua_generator
 import aiohttp
 from pypasser import reCaptchaV3
 
+from registrator_romania.bot import send_msg_into_chat
 from registrator_romania.proxy import aiohttp_session
 
 
@@ -143,6 +145,17 @@ def is_success(html_code: str) -> bool:
     if "<p>Felicitări!</p>" in html_code:
         return True
     return False
+
+
+def get_error(html_code: str) -> str:
+    r"""
+    Return text of error in <p class="alert alert-danger"> tag
+    """
+    s = bs4.BeautifulSoup(html_code, "lxml")
+    alert_tag = s.find("p", class_="alert alert-danger")
+    if not alert_tag:
+        return ""
+    return alert_tag.text
 
 
 def is_busy(html_code: str) -> bool:
@@ -284,22 +297,33 @@ async def main():
                     continue
 
                 name = user_data["Nume Pasaport"]
-                msg = "successfully" if is_success(html) else "failed"
 
-                log_msg = (
-                    f"registration for {name} user was "
-                    f"{msg}\n---\nnot places for date {dt.day}/{dt.month}"
-                    f"/{dt.year} is {is_busy(html)}\n---\n---"
-                    f"tip formular is {tip_formular}\n---"
-                )
-                logger.info(log_msg)
-
-                async with aiofiles.open(f"user_{name}.html", "w", encoding="utf-8") as f:
+                async with aiofiles.open(
+                    f"user_{name}.html", "w", encoding="utf-8"
+                ) as f:
                     await f.write(html)
 
                 if is_success(html) is False:
-                    logger.error(f"Registration for {name} was failed")
                     error += 1
+                    text_error = get_error(html)
+                    logger.error(
+                        f"Registration for {name} was failed. Error:\n"
+                        f"{text_error}.\n.Busy status {is_busy(html)}.\n"
+                        f"Date: {dt}\nTip formular: {tip_formular}"
+                    )
+                else:
+                    us_data = json.dumps(
+                        user_data, ensure_ascii=False, indent=2
+                    )
+                    msg = (
+                        f"Registration for {name} was successfully.\n"
+                        f"{us_data}\n"
+                    )
+                    logger.success(msg)
+                    try:
+                        await send_msg_into_chat(msg)
+                    except Exception:
+                        pass
 
         except Exception as e:
             logger.exception(e)
@@ -307,8 +331,8 @@ async def main():
         finally:
             if dt_now.hour == 9 and dt_now.minute >= 1:
                 return
-            if error:
-                continue
+            if not error:
+                return
 
 
 if __name__ == "__main__":

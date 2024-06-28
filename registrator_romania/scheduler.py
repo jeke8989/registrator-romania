@@ -13,6 +13,5 @@ async def start_scheduler(**kwargs) -> None:
     # await main()
     scheduler.add_job(main, "cron", max_instances=1, **kwargs)
     scheduler.start()
-    dt = datetime.now()
-    logger.info(f"Started scheduler. Datetime is {dt}")
+    logger.info(f"Started scheduler")
     logging.getLogger("apscheduler").setLevel(logging.INFO)
