@@ -185,6 +185,17 @@ def get_users_data():
     return objs
 
 
+def error_handler(f):
+    async def wrapper(*args, **kwargs):
+        try:
+            return await f(*args, **kwargs)
+        except Exception as e:
+            logger.exception(e)
+            return await wrapper(*args, **kwargs)
+    return wrapper
+
+
+@error_handler
 async def main():
     dt_now = get_dt()
     dt = date(dt_now.year, 10, dt_now.day)
@@ -290,7 +301,7 @@ async def main():
 
         except Exception as e:
             if str(e).count("Registration for "):
-                continue
+                logger.error(html)
             logger.exception(e)
 
         else:
