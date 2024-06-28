@@ -293,15 +293,13 @@ async def main():
                 )
                 logger.info(log_msg)
 
-                async with aiofiles.open(f"user_{name}.html", "w") as f:
+                async with aiofiles.open(f"user_{name}.html", "w", encoding="utf-8") as f:
                     await f.write(html)
 
                 if is_success(html) is False:
-                    raise TypeError(f"Registration for {name} was failed")
+                    logger.error(f"Registration for {name} was failed")
 
         except Exception as e:
-            if str(e).count("Registration for "):
-                logger.error(html)
             logger.exception(e)
 
         else:
