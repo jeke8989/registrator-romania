@@ -1,6 +1,7 @@
 import asyncio
 from datetime import date, datetime
 import json
+from pprint import pprint
 import random
 import string
 from typing import Optional
@@ -205,18 +206,11 @@ def error_handler(f):
         except Exception as e:
             logger.exception(e)
             return await wrapper(*args, **kwargs)
+
     return wrapper
 
 
-@error_handler
-async def main():
-    dt_now = get_dt()
-    dt = date(dt_now.year, 10, dt_now.day)
-    # dt = date(dt_now.year, 10, 17)
-
-    # 4 - articolul 10. 3 for artcolul 11
-    tip_formular = 4
-
+async def start_registration_process(dt: date, tip_formular: int):
     def random_string(n: int = 5):
         return "".join(random.choice(string.ascii_uppercase) for _ in range(n))
 
@@ -310,6 +304,121 @@ async def main():
                 return
             if not error:
                 return
+
+
+async def is_registrate(dt: datetime, user_data: dict, tip_formular: int):
+    dt_str = dt.strftime("%Y-%m-%d")
+    data = {
+        "draw": "3",
+        "columns[0][data]": "tip_formular",
+        "columns[0][name]": "",
+        "columns[0][searchable]": "true",
+        "columns[0][orderable]": "false",
+        "columns[0][search][value]": str(tip_formular),
+        "columns[0][search][regex]": "false",
+        "columns[1][data]": "email",
+        "columns[1][name]": "",
+        "columns[1][searchable]": "true",
+        "columns[1][orderable]": "false",
+        "columns[1][search][value]": "",
+        "columns[1][search][regex]": "false",
+        "columns[2][data]": "nume_pasaport",
+        "columns[2][name]": "",
+        "columns[2][searchable]": "true",
+        "columns[2][orderable]": "false",
+        "columns[2][search][value]": user_data["Nume Pasaport"],
+        "columns[2][search][regex]": "false",
+        "columns[3][data]": "prenume_pasaport",
+        "columns[3][name]": "",
+        "columns[3][searchable]": "true",
+        "columns[3][orderable]": "false",
+        "columns[3][search][value]": user_data["Prenume Pasaport"],
+        "columns[3][search][regex]": "false",
+        "columns[4][data]": "data_nasterii",
+        "columns[4][name]": "",
+        "columns[4][searchable]": "true",
+        "columns[4][orderable]": "false",
+        "columns[4][search][value]": "",
+        "columns[4][search][regex]": "false",
+        "columns[5][data]": "data_programarii",
+        "columns[5][name]": "",
+        "columns[5][searchable]": "true",
+        "columns[5][orderable]": "false",
+        "columns[5][search][value]": f"{dt_str} AND {dt_str}",
+        "columns[5][search][regex]": "false",
+        "columns[6][data]": "ora_programarii",
+        "columns[6][name]": "",
+        "columns[6][searchable]": "true",
+        "columns[6][orderable]": "false",
+        "columns[6][search][value]": "",
+        "columns[6][search][regex]": "false",
+        "columns[7][data]": "numar_pasaport",
+        "columns[7][name]": "",
+        "columns[7][searchable]": "true",
+        "columns[7][orderable]": "false",
+        "columns[7][search][value]": "",
+        "columns[7][search][regex]": "false",
+        "start": "0",
+        "length": "500",
+        "search[value]": "",
+        "search[regex]": "false",
+    }
+
+    @aiohttp_session()
+    async def send(session: aiohttp.ClientSession):
+        url = "https://programarecetatenie.eu/verificare_programare?ajax=true"
+        resp = await session.post(url, data=data)
+        response = await resp.json(content_type=None)
+        registrated_users = [u for u in response["data"]]
+        if user_data["Nume Pasaport"] in [
+            u["nume_pasaport"] for u in registrated_users
+        ] and user_data["Prenume Pasaport"] in [
+            u["prenume_pasaport"] for u in registrated_users
+        ]:
+            return True
+        return False
+
+    try:
+        return await send(), user_data
+    except Exception as e:
+        logger.exception(e)
+        return False, user_data
+
+
+async def check_registrations(dt: datetime, tip_formular: int):
+    users_data = get_users_data()
+
+    tasks = [
+        is_registrate(dt=dt, user_data=user_data, tip_formular=tip_formular)
+        for user_data in users_data
+    ]
+
+    for res in await asyncio.gather(*tasks, return_exceptions=True):
+        if not isinstance(res, tuple):
+            logger.exception(res)
+            continue
+
+        result, us_data = res
+        if result:
+            js = json.dumps(us_data, indent=2, ensure_ascii=False)
+            message = (
+                "Registration for user was successfully for "
+                f"tip formular {tip_formular} and {dt}!!!\n{js}"
+            )
+            await send_msg_into_chat(message)
+
+
+@error_handler
+async def main():
+    dt_now = get_dt()
+    # dt = date(dt_now.year, 10, 15)
+    dt = date(dt_now.year, 10, dt_now.day)
+
+    # 4 - articolul 10. 3 for artcolul 11
+    tip_formular = 4
+
+    await start_registration_process(dt, tip_formular)
+    await check_registrations(dt, tip_formular)
 
 
 if __name__ == "__main__":
