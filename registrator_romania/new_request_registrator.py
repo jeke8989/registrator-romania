@@ -218,18 +218,15 @@ async def main():
     tip_formular = 4
 
     def random_string(n: int = 5):
-        return "".join(
-            random.choice(string.ascii_uppercase + string.digits)
-            for _ in range(n)
-        )
+        return "".join(random.choice(string.ascii_uppercase) for _ in range(n))
 
     users_data = [
         {
-            "Nume Pasaport": f"P{random_string(5)}IR",
-            "Prenume Pasaport": f"{random_string(7)}DRI",
+            "Nume Pasaport": f"P{random_string(2)}IR",
+            "Prenume Pasaport": f"{random_string(2)}DRI",
             "Data nasterii": f"199{random.randint(0, 9)}-10-1{random.randint(0, 9)}",
-            "Locul naşterii": f"SI{random_string(3)}RI",
-            "Prenume Mama": f"REC{random_string(3)}YE",
+            "Locul naşterii": f"SI{random_string(1)}RI",
+            "Prenume Mama": f"REC{random_string(1)}YE",
             "Prenume Tata": "SABRI",
             "Adresa de email": f"{"".join(random.choice(string.ascii_uppercase) for _ in range(10))}@gmail.com",
             "Serie și număr Pașaport": f"U{random.randint(10_000_000, 10_999_999)}",
@@ -308,7 +305,7 @@ async def main():
                     text_error = get_error(html)
                     logger.error(
                         f"Registration for {name} was failed. Error:\n"
-                        f"{text_error}.\n.Busy status {is_busy(html)}.\n"
+                        f"{text_error}.\nBusy status {is_busy(html)}.\n"
                         f"Date: {dt}\nTip formular: {tip_formular}"
                     )
                 else:
