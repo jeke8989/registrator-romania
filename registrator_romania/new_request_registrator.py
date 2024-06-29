@@ -232,26 +232,6 @@ async def main():
             "Serie și număr Pașaport": f"U{random.randint(10_000_000, 10_999_999)}",
         }
         for _ in range(40)
-        # for nume, prenume, bdt, locul, mama, tata, pspt in [
-        #     [
-        #         "PAMIR",
-        #         "KADRI",
-        #         "1984-10-21",
-        #         "SILIVRI",
-        #         "RECEBIYE",
-        #         "SABRI",
-        #         "U32965790",
-        #     ],
-        #     [
-        #         "RAMIL",
-        #         "KUNAN",
-        #         "1986-5-15",
-        #         "SILIVRI",
-        #         "RECEBYE",
-        #         "SABRI",
-        #         "S20769456",
-        #     ],
-        # ]
     ]
     users_data = get_users_data()
 
