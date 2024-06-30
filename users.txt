@@ -46,7 +46,7 @@ SERIA ŞI NUMAR PASAPORT: S25180058
 PRENUME: Oğuz
 NUME: Şentürk
 DATA NAŞTERI: 1992-07-07
-LOCUL NAŞTERI: İstanbul/Fatih
+LOCUL NAŞTERI: İstanbul
 PRENUME MAMA: Hasibe
 PRENUME TATA: Nusret
 ADRESA DE MAIL : o.quz_1905@hotmail.com
@@ -118,7 +118,7 @@ SERIA ŞI NUMAR PASAPORT: U29281055
 PRENUME: Filiz
 NUME: Akın
 DATA NAŞTERI: 1972-12-01
-LOCUL NAŞTERI: Kırklareli /Pınarhisar / Kaynarca
+LOCUL NAŞTERI: Kırklareli
 PRENUME MAMA: Ayşe Akın
 PRENUME TATA: Demir Akın
 ADRESA DE MAIL : filizgonulacar@hotmail.com
