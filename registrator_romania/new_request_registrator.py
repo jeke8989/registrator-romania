@@ -1,7 +1,6 @@
 import asyncio
 from datetime import date, datetime
 import json
-from pprint import pprint
 import random
 import string
 from typing import Optional
@@ -165,6 +164,30 @@ def is_busy(html_code: str) -> bool:
     return False
 
 
+class Transliterator:
+    def __init__(self, language):
+        if language == "tr":
+            self.translit_dict = {
+                "Ş": "S",
+                "ş": "s",
+                "İ": "I",
+                "ı": "i",
+                "Ğ": "G",
+                "ğ": "g",
+                "Ç": "C",
+                "ç": "c",
+                "Ö": "O",
+                "ö": "o",
+                "Ü": "U",
+                "ü": "u",
+            }
+        else:
+            self.translit_dict = {}
+
+    def transliterate(self, text):
+        return "".join(self.translit_dict.get(char, char) for char in text)
+
+
 def get_users_data():
     keys = [
         "Prenume Pasaport",
@@ -184,7 +207,7 @@ def get_users_data():
         obj = {}
         for k, v in zip(keys, values.split("\n")):
             v = v.split(":")[-1].strip()
-
+            v = Transliterator("tr").transliterate(v)
             if k == "Data nasterii":
                 try:
                     dt = datetime.strptime(v, "%Y-%m-%d")
@@ -320,19 +343,19 @@ async def is_registrate(dt: datetime, user_data: dict, tip_formular: int):
         "columns[1][name]": "",
         "columns[1][searchable]": "true",
         "columns[1][orderable]": "false",
-        "columns[1][search][value]": "",
+        "columns[1][search][value]": user_data["Adresa de email"].strip(),
         "columns[1][search][regex]": "false",
         "columns[2][data]": "nume_pasaport",
         "columns[2][name]": "",
         "columns[2][searchable]": "true",
         "columns[2][orderable]": "false",
-        "columns[2][search][value]": user_data["Nume Pasaport"],
+        "columns[2][search][value]": "",
         "columns[2][search][regex]": "false",
         "columns[3][data]": "prenume_pasaport",
         "columns[3][name]": "",
         "columns[3][searchable]": "true",
         "columns[3][orderable]": "false",
-        "columns[3][search][value]": user_data["Prenume Pasaport"],
+        "columns[3][search][value]": "",
         "columns[3][search][regex]": "false",
         "columns[4][data]": "data_nasterii",
         "columns[4][name]": "",
@@ -405,20 +428,26 @@ async def check_registrations(dt: datetime, tip_formular: int):
                 "Registration for user was successfully for "
                 f"tip formular {tip_formular} and {dt}!!!\n{js}"
             )
-            await send_msg_into_chat(message)
+            try:
+                await send_msg_into_chat(message)
+            except Exception:
+                return
 
 
 @error_handler
 async def main():
     dt_now = get_dt()
-    # dt = date(dt_now.year, 10, 30)
-    dt = date(dt_now.year, 10, dt_now.day)
+    # dt = date(dt_now.year, 9, 17)
+    dt = date(dt_now.year, 10, 31)
 
     # 4 - articolul 10. 3 for artcolul 11
     tip_formular = 4
 
     await start_registration_process(dt, tip_formular)
-    await check_registrations(dt, tip_formular)
+    try:
+        await check_registrations(dt, tip_formular)
+    except Exception as e:
+        logger.exception(e)
 
 
 if __name__ == "__main__":
