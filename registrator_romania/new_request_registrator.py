@@ -417,7 +417,7 @@ async def main():
     # 4 - articolul 10. 3 for artcolul 11
     tip_formular = 4
 
-    # await start_registration_process(dt, tip_formular)
+    await start_registration_process(dt, tip_formular)
     await check_registrations(dt, tip_formular)
 
 
