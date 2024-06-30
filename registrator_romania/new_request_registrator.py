@@ -411,7 +411,7 @@ async def check_registrations(dt: datetime, tip_formular: int):
 @error_handler
 async def main():
     dt_now = get_dt()
-    # dt = date(dt_now.year, 10, 15)
+    # dt = date(dt_now.year, 10, 30)
     dt = date(dt_now.year, 10, dt_now.day)
 
     # 4 - articolul 10. 3 for artcolul 11
