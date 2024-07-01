@@ -265,6 +265,8 @@ async def start_registration_process(dt: date, tip_formular: int):
                     f"script found {free_places} free places for date: {dt}"
                 )
                 break
+            
+            logger.info(f"Script not found free places for date: {dt}")
             await asyncio.sleep(random.uniform(0.5, 1))
 
         finally:
