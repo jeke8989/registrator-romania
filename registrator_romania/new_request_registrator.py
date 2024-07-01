@@ -3,6 +3,7 @@ from datetime import date, datetime
 import json
 import random
 import string
+import traceback
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -78,7 +79,11 @@ async def check_places(
             KeyError,
             TypeError,
             AttributeError,
-        ):
+        ) as e:
+            msg = (
+                f"{e}: {await resp.text()}.\n{traceback.format_exc()}"
+            )
+            logger.error(msg)
             return None
 
 
@@ -252,26 +257,26 @@ async def start_registration_process(dt: date, tip_formular: int):
     ]
     users_data = get_users_data()
 
-    while True:
-        try:
-            free_places = await check_places(dt, tip_formular)
-        except Exception as e:
-            logger.exception(e)
-        else:
-            not_places = free_places is None
+    # while True:
+    #     try:
+    #         free_places = await check_places(dt, tip_formular)
+    #     except Exception as e:
+    #         logger.exception(e)
+    #     else:
+    #         not_places = free_places is None
 
-            if not_places is False:
-                logger.info(
-                    f"script found {free_places} free places for date: {dt}"
-                )
-                break
+    #         if not_places is False:
+    #             logger.info(
+    #                 f"script found {free_places} free places for date: {dt}"
+    #             )
+    #             break
             
-            logger.info(f"Script not found free places for date: {dt}")
-            await asyncio.sleep(random.uniform(0.5, 1))
+    #         logger.info(f"Script not found free places for date: {dt}")
+    #         await asyncio.sleep(random.uniform(0.5, 1))
 
-        finally:
-            if get_dt().hour == 9 and get_dt().minute >= 2:
-                return
+    #     finally:
+    #         if get_dt().hour == 9 and get_dt().minute >= 2:
+    #             return
 
     logger.info(
         f"Try to make an appointments. General count of users - {len(users_data)}"
@@ -440,7 +445,7 @@ async def check_registrations(dt: datetime, tip_formular: int):
 async def main():
     dt_now = get_dt()
     # dt = date(dt_now.year, 9, 17)
-    dt = date(dt_now.year, 10, 31)
+    dt = date(dt_now.year, 11, dt_now.day - 1)
 
     # 4 - articolul 10. 3 for artcolul 11
     tip_formular = 4
