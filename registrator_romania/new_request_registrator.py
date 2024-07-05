@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 import aiofiles
 import bs4
 from loguru import logger
+import openpyxl
+import pandas as pd
 import ua_generator
 import aiohttp
 from pypasser import reCaptchaV3
@@ -80,9 +82,7 @@ async def check_places(
             TypeError,
             AttributeError,
         ) as e:
-            msg = (
-                f"{e}: {await resp.text()}.\n{traceback.format_exc()}"
-            )
+            msg = f"{e}: {await resp.text()}.\n{traceback.format_exc()}"
             logger.error(msg)
             return None
 
@@ -224,7 +224,74 @@ def get_users_data():
         obj["Adresa de email"] = obj["Adresa de email"].lower()
         objs.append(obj)
 
+    return prepare_users_data(objs)
+
+
+def prepare_users_data(users_data: list[dict]):
+    keys = [
+        "Prenume Pasaport",
+        "Nume Pasaport",
+        "Data nasterii",
+        "Locul naşterii",
+        "Prenume Mama",
+        "Prenume Tata",
+        "Adresa de email",
+        "Serie și număr Pașaport",
+    ]
+    objs = []
+    for us_data in users_data:
+        obj = {}
+        for k, v in us_data.items():
+            # Replace values like `Doğum tarihi:09.09.1976`
+            v = v.split(":")[-1].strip()
+            # Change turkey letters on english letters
+            v = Transliterator("tr").transliterate(v)
+
+            if k == "Data nasterii":
+                try:
+                    dt = datetime.strptime(v, "%Y-%m-%d")
+                except Exception:
+                    dt = datetime.strptime(v, "%d-%m-%Y")
+                # We need to format date like `1976-09-09`
+                v = dt.strftime("%Y-%m-%d")
+                assert datetime.strptime(v, "%Y-%m-%d")
+
+            obj[k] = v
+
+        # Tranform to lower register email
+        obj["Adresa de email"] = obj["Adresa de email"].lower()
+        objs.append(obj)
+
+    assert all(k in obj for k in keys for obj in objs)
     return objs
+
+
+def get_users_data_from_xslx():
+    keys = [
+        "Prenume Pasaport",
+        "Nume Pasaport",
+        "Data nasterii",
+        "Locul naşterii",
+        "Prenume Mama",
+        "Prenume Tata",
+        "Adresa de email",
+        "Serie și număr Pașaport",
+    ]
+
+    w = openpyxl.load_workbook("users.xlsx")
+    sheet = w.active
+    data = []
+    for row in sheet.iter_rows(min_row=0, max_row=None, values_only=True):
+        if not data:
+            assert row
+            row = keys.copy()
+
+        data.append(row)
+    df = pd.DataFrame(data)
+    df.columns = df.iloc[0]
+    df.drop(df.index[0], inplace=True)
+    objs_raw = df.to_dict("records")
+    return prepare_users_data(objs_raw)
 
 
 def error_handler(f):
@@ -255,7 +322,7 @@ async def start_registration_process(dt: date, tip_formular: int):
         }
         for _ in range(40)
     ]
-    users_data = get_users_data()
+    users_data = get_users_data_from_xslx()
 
     # while True:
     #     try:
@@ -270,7 +337,7 @@ async def start_registration_process(dt: date, tip_formular: int):
     #                 f"script found {free_places} free places for date: {dt}"
     #             )
     #             break
-            
+
     #         logger.info(f"Script not found free places for date: {dt}")
     #         await asyncio.sleep(random.uniform(0.5, 1))
 
@@ -298,10 +365,8 @@ async def start_registration_process(dt: date, tip_formular: int):
                     continue
 
                 name = user_data["Nume Pasaport"]
-
-                async with aiofiles.open(
-                    f"user_{name}.html", "w", encoding="utf-8"
-                ) as f:
+                fn = f"user_{name}.html"
+                async with aiofiles.open(fn, "w", encoding="utf-8") as f:
                     await f.write(html)
 
                 if is_success(html) is False:
@@ -322,7 +387,7 @@ async def start_registration_process(dt: date, tip_formular: int):
                     )
                     logger.success(msg)
                     try:
-                        await send_msg_into_chat(msg)
+                        await send_msg_into_chat(msg, file=fn)
                     except Exception:
                         pass
 
@@ -350,19 +415,19 @@ async def is_registrate(dt: datetime, user_data: dict, tip_formular: int):
         "columns[1][name]": "",
         "columns[1][searchable]": "true",
         "columns[1][orderable]": "false",
-        "columns[1][search][value]": user_data["Adresa de email"].strip(),
+        "columns[1][search][value]": "",
         "columns[1][search][regex]": "false",
         "columns[2][data]": "nume_pasaport",
         "columns[2][name]": "",
         "columns[2][searchable]": "true",
         "columns[2][orderable]": "false",
-        "columns[2][search][value]": "",
+        "columns[2][search][value]": user_data["Nume Pasaport"].strip(),
         "columns[2][search][regex]": "false",
         "columns[3][data]": "prenume_pasaport",
         "columns[3][name]": "",
         "columns[3][searchable]": "true",
         "columns[3][orderable]": "false",
-        "columns[3][search][value]": "",
+        "columns[3][search][value]": user_data["Prenume Pasaport"].strip(),
         "columns[3][search][regex]": "false",
         "columns[4][data]": "data_nasterii",
         "columns[4][name]": "",
@@ -416,7 +481,7 @@ async def is_registrate(dt: datetime, user_data: dict, tip_formular: int):
 
 
 async def check_registrations(dt: datetime, tip_formular: int):
-    users_data = get_users_data()
+    users_data = get_users_data_from_xslx()
 
     tasks = [
         is_registrate(dt=dt, user_data=user_data, tip_formular=tip_formular)

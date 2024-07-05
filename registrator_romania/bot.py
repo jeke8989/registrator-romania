@@ -1,7 +1,7 @@
 """Module contain functional for work with Telegram Bot."""
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import BufferedInputFile
+from aiogram.types import BufferedInputFile, FSInputFile
 
 from registrator_romania.config import get_config
 
@@ -10,14 +10,25 @@ bot = Bot(cfg["BOT_TOKEN"])
 dp = Dispatcher()
 
 
-async def send_msg_into_chat(message: str) -> None:
+async def send_msg_into_chat(message: str, file: str = None) -> None:
     """Send message into chat telegram."""
     message = f"<b>THIS IS A LOG MSG 🔴 !</b>\n\n{message}"
-    await bot.send_message(
-        get_config()["telegram_bot"]["chat_id"],
-        message,
-        parse_mode="HTML"
-    )
+    chat_id = get_config()["telegram_bot"]["chat_id"]
+    if file:
+        document = FSInputFile(file)
+        await bot.send_document(
+            chat_id,
+            document,
+            caption=message,
+            parse_mode="HTML"
+        )
+        
+    else:
+        await bot.send_message(
+            chat_id,
+            message,
+            parse_mode="HTML"
+        )
 
 
 async def send_screenshot_to_chat(screenshot: bytes) -> None:
