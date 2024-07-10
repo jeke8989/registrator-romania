@@ -8,6 +8,7 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 import aiofiles
+import aiohttp.client_exceptions
 import bs4
 import dateutil
 import dateutil.parser
@@ -20,7 +21,7 @@ from aiohttp.client_exceptions import ClientHttpProxyError
 from pypasser import reCaptchaV3
 
 from registrator_romania.bot import send_msg_into_chat
-from registrator_romania.proxy import AiohttpSession, Proxysio, aiohttp_session
+from registrator_romania.proxy import AiohttpSession, aiohttp_session
 
 
 SITE_TOKEN = "6LcnPeckAAAAABfTS9aArfjlSyv7h45waYSB_LwT"
@@ -146,7 +147,7 @@ async def registrate(
                 URL_GENERAL, data=data, proxy=proxy
             ) as resp:
                 return (await resp.text(), user_data)
-        except ClientHttpProxyError:
+        except (ClientHttpProxyError, aiohttp.ClientProxyConnectionError):
             async with session.post(URL_GENERAL, data=data) as resp:
                 return (await resp.text(), user_data)
 

@@ -10,6 +10,7 @@ from pprint import pprint
 import queue
 import random
 from functools import wraps
+import re
 import socket
 import threading
 import traceback
@@ -90,6 +91,7 @@ async def check_proxy(
         aiohttp.ClientProxyConnectionError,
         aiohttp.ClientConnectionError,
         aiohttp.ServerDisconnectedError,
+        aiohttp.ClientResponseError,
         aiohttp.ClientHttpProxyError,
         aiohttp.ClientOSError,
         asyncio.TimeoutError,
@@ -98,7 +100,7 @@ async def check_proxy(
     async with AiohttpSession().generate(
         close_connector=close_connector,
         connector=connector,
-        total_timeout=timeout or 300,
+        total_timeout=timeout or 20,
     ) as session:
         try:
             start = datetime.datetime.now()
@@ -114,6 +116,8 @@ async def check_proxy(
                 return result
         except net_errors:
             return tuple()
+        except UnicodeError:
+            return tuple()
         except Exception as e:
             print(f"{e.__class__.__name__}: {e}")
             # logger.exception(e)
@@ -127,7 +131,7 @@ class AiohttpSession:
     def generate_connector(self):
         return aiohttp.TCPConnector(
             ssl=False,
-            limit=None,
+            limit=0,
             limit_per_host=0,
             force_close=False,
         )
@@ -156,32 +160,32 @@ def run_th(proxies: list[str], q: multiprocessing.Queue):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     tasks = [check_proxy(p, queue=q, close_connector=True) for p in proxies]
-    loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+    results = loop.run_until_complete(
+        asyncio.gather(*tasks, return_exceptions=True)
+    )
     loop.close()
+    return results
 
 
 class FilterProxies:
-    def __init__(
-        self,
-        pr: multiprocessing.Process,
-        q: multiprocessing.Queue,
-        e: multiprocessing.Event,
-        debug: bool = False,
-    ) -> None:
-        self._process = pr
-        self._queue = q
-        self._event = e
+    def __init__(self, proxies: list[str], debug: bool = False) -> None:
+        self._process: multiprocessing.Process = None
+        self._queue = multiprocessing.Queue()
+        self._event = multiprocessing.Event()
         self._pool = AiohttpSession().generate_connector()
         self._proxies = []
         self._proxies_reports = {}
         self.debug = debug
+        self._append_pool_task: asyncio.Task = None
+        self._src_proxies_list = proxies
 
     def __aiter__(self):
         return self
 
     def __await__(self):
+        self.start_background()
         return self._append_pool().__await__()
-    
+
     def __del__(self):
         print(
             "Unstopped background proccess filter "
@@ -197,9 +201,13 @@ class FilterProxies:
                 aiohttp.ServerDisconnectedError,
                 aiohttp.ClientHttpProxyError,
                 aiohttp.ClientOSError,
+                aiohttp.ClientResponseError,
                 asyncio.TimeoutError,
             )
-            
+
+            if proxy in self.proxies:
+                return
+
             async with AiohttpSession().generate(
                 connector=self._pool, total_timeout=7
             ) as session:
@@ -207,68 +215,120 @@ class FilterProxies:
                     logger.debug(f"append_pool: {proxy}")
                 start = datetime.datetime.now()
                 try:
-                    async with session.get(
-                        "https://api.ipify.org", proxy=proxy
-                    ):
-                        stop = datetime.datetime.now()
-                        if self.debug:
-                            logger.debug(f"Second check was successfully: {proxy} - {start - stop}")
+                    # async with session.get(
+                    #     "https://api.ipify.org", proxy=proxy
+                    # ):
+                    #     stop = datetime.datetime.now()
+                    #     if self.debug:
+                    #         logger.debug(
+                    #             f"Second check was successfully: {proxy} - {start - stop}"
+                    #         )
                     self._proxies.append(proxy)
                 except net_errors:
                     pass
                 except Exception as e:
-                    print(e)
+                    print(f"{e.__class__.__name__}: {e}")
 
         async def background():
-            while True:
-                tasks = []
-                async for proxy, time in self:
-                    if proxy in self.proxies:
-                        continue
-                    tasks.append(asyncio.create_task(send_request(proxy)))
+            try:
+                while True:
+                    tasks = []
+                    async for proxy, time in self:
+                        tasks.append(asyncio.create_task(send_request(proxy)))
 
-                await asyncio.gather(*tasks)
+                    await asyncio.gather(*tasks)
+                    self.start_background()
+            except asyncio.CancelledError:
+                print("Background task was cancelled")
+                pass
 
-        asyncio.get_event_loop().create_task(background())
+        self._append_pool_task = asyncio.get_event_loop().create_task(
+            background()
+        )
 
     async def __anext__(self):
         q = self._queue
 
-        if self._event.is_set() and q.empty():
+        def stop():
             if self.debug:
                 logger.debug("StopAsyncIteration")
-            q.close()
-
-            del self._queue
-            del self._process
-
             raise StopAsyncIteration
 
-        try:
-            result = await asyncio.to_thread(q.get)
-        except Exception as e:
-            logger.critical(traceback.format_exc(e))
-        else:
-            if isinstance(result, tuple):
-                time = result[2]
-                proxy = result[1]
-                if self.debug:
-                    logger.debug(f"__anext__: {proxy}")
+        while True:
+            if self._event.is_set():
+                stop()
+                raise StopAsyncIteration
 
-                return proxy, time
+            try:
+                result = await asyncio.to_thread(q.get, timeout=5)
+            except queue.Empty:
+                if self._event.is_set():
+                    stop()
+                    raise StopAsyncIteration
+
+            except Exception as e:
+                logger.critical(traceback.format_exc(e))
+
+            else:
+                if isinstance(result, tuple):
+                    time = result[2]
+                    proxy = result[1]
+                    if self.debug:
+                        logger.debug(f"__anext__: {proxy}")
+
+                    return proxy, time
+
+                if result == "finish":
+                    stop()
+                    raise StopAsyncIteration
 
     async def __aenter__(self):
         return self
 
-    def drop_background(self):
-        self._event.set()
+    def restart_background(self):
+        self.drop_background()
+        self.start_background()
 
-        self._process.kill()
-        self._process.terminate()
-        self._queue.close()
+    def drop_background(self):
+        if self._process:
+            if self._process.is_alive():
+                self._process.kill()
+            self._process.close()
+        if self._queue:
+            self._queue.close()
 
         del self._queue
         del self._process
+        self._queue = multiprocessing.Queue()
+        self._process = None
+
+    def start_background(self):
+        def run(
+            q: multiprocessing.Queue,
+            proxies: list[str],
+            event: multiprocessing.Event,
+        ):
+            # proxies = proxies[:500]
+            divides = 1500
+            # proxies [0, 0, 0, 0, 0, 0]
+            # divides: 2, chunks [[0, 0], [0, 0], [0, 0]]
+            chunks = divide_list(proxies, divides=divides)
+            
+            for chunk in divide_list(chunks, divides=2):
+                with ThreadPoolExecutor(max_workers=os.cpu_count() ** 2) as e:
+                    e.map(run_th, chunk, [q for _ in chunk])
+
+            # with ThreadPoolExecutor(max_workers=os.cpu_count() ** 2) as e:
+            #     e.map(run_th, chunks, [q for _ in chunks])
+
+            event.set()
+            q.put("finish")
+
+        self._event.clear()
+        self._process = multiprocessing.Process(
+            target=run, args=(self._queue, self._src_proxies_list, self._event)
+        )
+        self._process.start()
 
     async def __aexit__(self, *args, **kwargs):
         return
@@ -286,7 +346,7 @@ class FilterProxies:
             connector=self._pool, total_timeout=timeout
         )
         self_class = self
-  
+
         async def _request(*args, **kwargs):
             proxy_exceptions = (
                 aiohttp.ClientProxyConnectionError,
@@ -295,32 +355,32 @@ class FilterProxies:
                 aiohttp.client_exceptions.ClientHttpProxyError,
                 aiohttp.client_exceptions.ClientProxyConnectionError,
                 aiohttp.client_exceptions.ClientResponseError,
-                asyncio.TimeoutError
+                asyncio.TimeoutError,
             )
             proxy = kwargs.get("proxy")
             url = args[1]
-            
+
             if self_class.debug and proxy:
                 logger.debug(f"Do request on {url} with proxy {proxy}")
-                
+
             try:
                 result = await session._request_(*args, **kwargs)
                 status = result.status
-                
-                if status != 200:
+
+                if proxy and status != 200:
                     self_class.proxy_not_working(proxy=proxy)
                 elif proxy and proxy in self_class.proxies:
                     self_class.proxy_working(proxy=proxy)
-                    
+
                 return result
             except proxy_exceptions as e:
                 if proxy and proxy in self_class.proxies:
                     self_class.proxy_not_working(proxy=proxy)
                 raise e
-        
+
         session._request_ = session._request
         session._request = _request
-        
+
         return session, self.proxies
 
     def proxy_not_working(self, proxy: str):
@@ -332,7 +392,7 @@ class FilterProxies:
 
         self._proxies_reports[proxy] += 1
 
-        if self._proxies_reports[proxy] >= 3:
+        if self._proxies_reports[proxy] >= 30:
             del self._proxies_reports[proxy]
             self._proxies.remove(proxy)
 
@@ -347,67 +407,32 @@ class FilterProxies:
 
 
 def divide_list(src_list: list, divides: int = 100):
-    return [
-        src_list[x : x + divides] for x in range(0, len(src_list), divides)
-    ]
+    return [src_list[x : x + divides] for x in range(0, len(src_list), divides)]
 
 
 async def filter_proxies(proxies: list[str], debug: bool = False):
     q = multiprocessing.Queue()
     event = multiprocessing.Event()
 
-    def run(
-        q: multiprocessing.Queue,
-        proxies: list[str],
-        event: multiprocessing.Event,
-    ):
-        divides = 1000
-        chunks = divide_list(proxies, divides=divides)
+    # def run(
+    #     q: multiprocessing.Queue,
+    #     proxies: list[str],
+    #     event: multiprocessing.Event,
+    # ):
+    #     divides = 1500
+    #     chunks = divide_list(proxies, divides=divides)
 
-        with ThreadPoolExecutor(max_workers=os.cpu_count() ** 2) as e:
-            e.map(run_th, chunks, [q for _ in chunks])
+    #     with ThreadPoolExecutor(max_workers=os.cpu_count() ** 2) as e:
+    #         e.map(run_th, chunks, [q for _ in chunks])
 
-        event.set()
+    #     event.set()
 
-    pr = multiprocessing.Process(target=run, args=(q, proxies, event))
-    pr.start()
+    # pr = multiprocessing.Process(target=run, args=(q, proxies, event))
+    # pr.start()
 
-    f = FilterProxies(pr, q, event, debug=debug)
+    f = FilterProxies(proxies, debug=debug)
     await f
     return f
-
-
-class Proxysio:
-    """
-    Documentation - https://proxys.io/ru/api/v2/doc
-    """
-
-    def __init__(self) -> None:
-        cfg = config.get_config()
-        self._api_key = cfg["proxysio"]["api_key"]
-        self._base_url = "https://proxys.io/ru/api/v2"
-
-    async def list_proxy(
-        self, scheme: Literal["http", "https"] = "http"
-    ) -> list[str]:
-        url = self._base_url + f"/ip?key={self._api_key}"
-
-        @aiohttp_session()
-        async def request(session: aiohttp.ClientSession):
-            resp = await session.get(url)
-            return await resp.json()
-
-        # response = await request()
-        response = ["http://tBO8tjSZXj:M64o9nRlGo@65.21.25.28:1033"]
-        logger.debug(f"Proxysio list_proxy: \n{response}")
-        return response
-        # _key = f"port_{scheme}"
-        # user = response["data"][0]["username"]
-        # password = response["data"][0]["password"]
-        # return [
-        #     f"{scheme}://{user}:{password}@{obj["ip"]}:{obj[_key]}"
-        #     for obj in response["data"][0]["list_ip"]
-        # ]
 
 
 class ProxyMaster:
@@ -430,6 +455,19 @@ class FreeProxies:
 
     async def list_proxy(self) -> list[str]:
         url = "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/http_proxies.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"http://{p.strip()}" for p in proxies.splitlines()]
+
+
+class FreeProxiesList:
+    """
+    GitHub - https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt
+    """
+
+    async def list_proxy(self) -> list[str]:
+        url = "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt"
         async with AiohttpSession().generate(close_connector=True) as session:
             async with session.get(url) as resp:
                 proxies = await resp.text()
@@ -462,35 +500,95 @@ class GeoNode:
                 ]
 
 
+class ImRavzanProxyList:
+    """
+    https://raw.githubusercontent.com/im-razvan/proxy_list/main/http.txt
+    """
+
+    async def list_proxy(self):
+        url = "https://raw.githubusercontent.com/im-razvan/proxy_list/main/http.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"http://{p.strip()}" for p in proxies.splitlines()]
+
+
+class LionKingsProxy:
+    """
+    https://raw.githubusercontent.com/saisuiu/Lionkings-Http-Proxys-Proxies/main/free.txt
+    """
+
+    async def list_proxy(self):
+        url = "https://raw.githubusercontent.com/saisuiu/Lionkings-Http-Proxys-Proxies/main/free.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [
+                    f"http://{p.strip()}"
+                    for p in proxies.splitlines()
+                    if is_host_port(p.strip())
+                ]
+
+
+def is_host_port(v: str):
+    if re.findall(r"\d+:\d+", v):
+        return True
+
+
+async def get_ip(session: aiohttp.ClientSession, proxy=None):
+    try:
+        async with session.get("https://api.ipify.org", proxy=proxy) as resp:
+            return await resp.text()
+    except Exception:
+        pass
+
+
 async def main():
-    p = ProxyMaster()
-    proxies = await p.list_proxy()
-    # proxies = proxies + await FreeProxies().list_proxy()
-    p = GeoNode()
-    proxies = await p.list_proxy() + await FreeProxies().list_proxy()
+    proxies = (
+        await GeoNode().list_proxy()
+        + await FreeProxies().list_proxy()
+        + await FreeProxiesList().list_proxy()
+        + await ImRavzanProxyList().list_proxy()
+        + await LionKingsProxy().list_proxy()
+        + await ProxyMaster().list_proxy()
+    )
+
     print(f"Raw proxies: {len(proxies)}")
 
-    filtered = await filter_proxies(proxies)
+    pool = await filter_proxies(proxies, debug=False)
+    works_proxy = 0
+
     while True:
-        await asyncio.sleep(2)
-        pprint(filtered.proxies)
-        if not filtered.proxies:
+        print(f"\n\nWe have {len(pool.proxies)} proxies")
+        if not pool.proxies:
+            await asyncio.sleep(2)
             continue
 
-        session, proxies = await filtered.get_session()
-        proxy = random.choice(proxies)
-        try:
-            async with session:
-                async with session.get(
-                    "https://icanhazip.com", proxy=proxy
-                ) as resp:
-                    logger.success(f"Proxy {proxy}:", await resp.text())
-                    filtered.proxy_working(proxy)
-        except Exception as e:
-            logger.warning(
-                f"icanhazip.com: {e}. proxy {proxy} not working", flush=True
+        session, proxies = await pool.get_session()
+        async with session:
+            start = datetime.datetime.now()
+
+            res = await asyncio.gather(
+                *[get_ip(session, proxy) for proxy in proxies]
             )
-            filtered.proxy_not_working(proxy)
+            stop = datetime.datetime.now()
+            works_num = len(list(filter(None, res)))
+            if works_num > works_proxy:
+                works_proxy = works_num
+                percents = works_num / len(pool.proxies) * 100
+                with open("statistic-large.txt", "a") as f:
+                    f.write(
+                        f"{datetime.datetime.now()} "
+                        f"Works {works_num} proxy. "
+                        f"Total - {len(pool.proxies)} proxies. "
+                        f"Working {percents}%"
+                        f"Requests was send at {stop-start}\n"
+                    )
+
+            print(
+                stop - start,
+                f"\nwork only {works_num} proxies",
+            )
 
 
 if __name__ == "__main__":
