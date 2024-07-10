@@ -1,3 +1,6 @@
 telegram_bot:
   # chat_id: -4207291511
   chat_id: -4255435072
+
+proxysio:
+  api_key: $API_KEY_PROXYSIO

@@ -27,6 +27,9 @@ aiohttp-socks = "^0.8.4"
 pytest = "^8.2.2"
 pytest-asyncio = "^0.23.7"
 openpyxl = "^3.1.5"
+orjson = "^3.10.6"
+python-dateutil = "^2.9.0.post0"
+requests-toolbelt = "^1.0.0"
 
 
 [build-system]

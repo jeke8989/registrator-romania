@@ -9,15 +9,18 @@ from zoneinfo import ZoneInfo
 
 import aiofiles
 import bs4
+import dateutil
+import dateutil.parser
 from loguru import logger
 import openpyxl
 import pandas as pd
 import ua_generator
 import aiohttp
+from aiohttp.client_exceptions import ClientHttpProxyError
 from pypasser import reCaptchaV3
 
 from registrator_romania.bot import send_msg_into_chat
-from registrator_romania.proxy import aiohttp_session
+from registrator_romania.proxy import AiohttpSession, Proxysio, aiohttp_session
 
 
 SITE_TOKEN = "6LcnPeckAAAAABfTS9aArfjlSyv7h45waYSB_LwT"
@@ -87,7 +90,13 @@ async def check_places(
             return None
 
 
-async def registrate(users_data: list[dict], tip_formular: int, reg_dt: date):
+async def registrate(
+    users_data: list[dict],
+    tip_formular: int,
+    reg_dt: date,
+    proxies: str | None = None,
+    _session: aiohttp.ClientSession | None = None,
+):
     # Request body
     # {
     #     "tip_formular": "3",
@@ -106,7 +115,14 @@ async def registrate(users_data: list[dict], tip_formular: int, reg_dt: date):
     # }
 
     @aiohttp_session()
-    async def reg(session: aiohttp.ClientSession, user_data: dict):
+    async def reg(
+        session: aiohttp.ClientSession,
+        user_data: dict,
+        proxy: str | None = None,
+    ):
+        if _session:
+            session = _session
+
         session._default_headers = get_headers()
 
         data = {
@@ -125,12 +141,25 @@ async def registrate(users_data: list[dict], tip_formular: int, reg_dt: date):
             "g-recaptcha-response": await get_captcha_response(),
         }
 
-        async with session.post(URL_GENERAL, data=data) as resp:
-            return (await resp.text(), user_data)
+        try:
+            async with session.post(
+                URL_GENERAL, data=data, proxy=proxy
+            ) as resp:
+                return (await resp.text(), user_data)
+        except ClientHttpProxyError:
+            async with session.post(URL_GENERAL, data=data) as resp:
+                return (await resp.text(), user_data)
 
     tasks = []
+    proxy_iterator = iter(proxies)
     for user_data in users_data:
-        tasks.append(reg(user_data))
+        try:
+            p = next(proxy_iterator)
+        except StopIteration:
+            proxy_iterator = iter(proxies)
+            p = next(proxy_iterator)
+
+        tasks.append(reg(user_data, p))
 
     return await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -249,16 +278,19 @@ def prepare_users_data(users_data: list[dict]):
 
             if k == "Data nasterii":
                 try:
-                    dt = datetime.strptime(v, "%Y-%m-%d")
-                except Exception:
-                    dt = datetime.strptime(v, "%d-%m-%Y")
+                    dt = dateutil.parser.parse(v, dayfirst=False)
+                except dateutil.parser.ParserError:
+                    dt = dateutil.parser.parse(v, dayfirst=True)
+
                 # We need to format date like `1976-09-09`
                 v = dt.strftime("%Y-%m-%d")
                 assert datetime.strptime(v, "%Y-%m-%d")
 
             obj[k] = v
 
-        # Tranform to lower register email
+        # Tranform case
+        obj["Nume Pasaport"] = obj["Nume Pasaport"].upper()
+        obj["Prenume Pasaport"] = obj["Prenume Pasaport"].upper()
         obj["Adresa de email"] = obj["Adresa de email"].lower()
         objs.append(obj)
 
@@ -317,10 +349,10 @@ async def start_registration_process(dt: date, tip_formular: int):
             "Locul naşterii": f"SI{random_string(1)}RI",
             "Prenume Mama": f"REC{random_string(1)}YE",
             "Prenume Tata": "SABRI",
-            "Adresa de email": f"{"".join(random.choice(string.ascii_uppercase) for _ in range(10))}@gmail.com",
+            "Adresa de email": f"{random_string()}@gmail.com",
             "Serie și număr Pașaport": f"U{random.randint(10_000_000, 10_999_999)}",
         }
-        for _ in range(40)
+        for _ in range(2)
     ]
     users_data = get_users_data_from_xslx()
 
@@ -349,11 +381,20 @@ async def start_registration_process(dt: date, tip_formular: int):
         f"Try to make an appointments. General count of users - {len(users_data)}"
     )
 
+    p = Proxysio()
+    proxyies = await p.list_proxy(scheme="http")
+    logger.debug(f"Proxies: {proxyies}")
+    loop = asyncio.get_running_loop()
+    session = AiohttpSession().generate()
+
+    tasks = []
     while True:
         dt_now = get_dt()
         error = 0
         try:
-            results = await registrate(users_data, tip_formular, dt)
+            results = await registrate(
+                users_data, tip_formular, dt, proxies=proxyies, _session=session
+            )
 
             for result in results:
                 if not isinstance(result, tuple):
@@ -386,19 +427,36 @@ async def start_registration_process(dt: date, tip_formular: int):
                         f"{us_data}\n"
                     )
                     logger.success(msg)
-                    try:
-                        await send_msg_into_chat(msg, file=fn)
-                    except Exception:
-                        pass
+                    tasks.append(
+                        loop.create_task(send_msg_into_chat(msg, file=fn))
+                    )
+                    users_data.remove(user_data)
+            await asyncio.sleep(1.5)
 
         except Exception as e:
             logger.exception(e)
+            error += 1
 
         finally:
             if dt_now.hour == 9 and dt_now.minute >= 1:
-                return
+                break
             if not error:
-                return
+                break
+
+    for task in tasks:
+        task: asyncio.Task
+
+        if task.done():
+            try:
+                exception = task.exception()
+                logger.exception(exception)
+            except asyncio.CancelledError as exc:
+                logger.exception(exc)
+        else:
+            try:
+                await task
+            except Exception as e:
+                logger.exception(e)
 
 
 async def is_registrate(dt: datetime, user_data: dict, tip_formular: int):
