@@ -1,9 +1,12 @@
 import asyncio
 import calendar
 from datetime import datetime, date
+from operator import le
 from pprint import pprint
 import time
 from typing import Required, TypedDict
+from zoneinfo import ZoneInfo
+import aiofiles
 from loguru import logger
 
 import aiohttp
@@ -455,56 +458,74 @@ class APIRomania:
                 return await resp.json(content_type=resp.content_type)
 
 
-async def registration(
-    tip_formular: int, year: int, month: int, registration_date: datetime
-):
+async def registration(tip_formular: int, registration_date: datetime):
     api = APIRomania()
     users_data = get_users_data_from_xslx()
     # pool = await api.get_proxy_pool()
     proxies = []
+    successfully_registered = []
+    report_tasks = []
     while True:
+        dt = moscow_dt_now()
         await asyncio.sleep(2)
         places = await api.get_free_places_for_date(
             tip_formular=tip_formular,
-            month=month,
+            month=registration_date.month,
             day=registration_date.day,
-            year=year,
+            year=registration_date.year,
         )
         if not places:
             continue
 
         errors = 0
         for us in users_data:
+            if us in successfully_registered:
+                continue
             try:
                 html = await api.make_registration(
                     us,
                     registration_date=registration_date,
                     tip_formular=tip_formular,
                 )
+                
+                if api.is_success_registration(html):
+                    successfully_registered.append(us)
+                
                 fn = f"{us["Nume Pasaport"]}-{time.time()}.html"
-
                 with open(fn, "w") as f:
                     f.write(html)
 
-                asyncio.get_event_loop().create_task(
+                report_tasks.append(
                     bot.send_msg_into_chat(
-                        f"Успешная регистрация для {us["Nume Pasaport"]}!", fn
+                        f"Попытка регистрации для {us["Nume Pasaport"]}!", fn
                     )
                 )
-                users_data.remove(us)
+
             except Exception as e:
                 logger.exception(e)
                 errors += 1
+        
+        if len(successfully_registered) == len(users_data):
+            break
+        
+        if dt.hour == 9 and dt.minute >= 1:
+            break
+    
+    for task in report_tasks:
+        await task
+        await asyncio.sleep(3)
 
-        if not users_data:
-            return
+
+def moscow_dt_now():
+    return datetime.now().astimezone(tz=ZoneInfo("Europe/Moscow"))
 
 
 async def main():
-    year = 2024
-    month = 10
-    tip_formular = 5
-    registration_date = datetime(year=year, month=month, day=datetime.now().day)
+    tip_formular = 4
+    moscow_dt = moscow_dt_now()
+    registration_date = datetime(
+        year=moscow_dt.year, month=11, day=datetime.now().day
+    )
 
     # await registration(tip_formular, year, month, registration_date)
     # api = APIRomania()
@@ -525,8 +546,8 @@ async def main():
     # await api.make_registration(user_data, registration_date, tip_formular)
 
     # users_data = get_users_data_from_xslx()
-    await registration(tip_formular, year, month, registration_date)
-    # pprint(users_data)
+    await registration(tip_formular, registration_date)
+    # pprint(users_data)    
     ...
 
 

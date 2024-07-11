@@ -1,4 +1,5 @@
-SESSION WITH URL: https://programarecetatenie.eu/programare_onlinehttp://195.62.32.117:22331: Successfully. Timeout: 0:00:00.525966
+SESSION WITH URL: https://programarecetatenie.eu/programare_online
+http://195.62.32.117:22331: Successfully. Timeout: 0:00:00.525966
 http://66.65.180.153:8080: Failed. Timeout: 0:00:05.998002
 http://195.62.32.117:22331: Successfully. Timeout: 0:00:00.174597
 http://163.172.33.137:4001: Successfully. Timeout: 0:00:00.175485
