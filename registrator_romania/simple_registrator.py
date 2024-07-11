@@ -147,7 +147,7 @@ async def start_registration(month: int, tip_formular: int, use_proxy: bool):
 
 
 async def main():
-    tip_formular = 5
+    tip_formular = 3
     month = 11
     proxy = True
 

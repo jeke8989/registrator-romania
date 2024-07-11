@@ -337,11 +337,11 @@ def error_handler(f):
     return wrapper
 
 
-async def start_registration_process(dt: date, tip_formular: int):
+def generate_fake_users_data(n: int = 20):
     def random_string(n: int = 5):
         return "".join(random.choice(string.ascii_uppercase) for _ in range(n))
 
-    users_data = [
+    return [
         {
             "Nume Pasaport": f"P{random_string(2)}IR",
             "Prenume Pasaport": f"{random_string(2)}DRI",
@@ -352,8 +352,13 @@ async def start_registration_process(dt: date, tip_formular: int):
             "Adresa de email": f"{random_string()}@gmail.com",
             "Serie și număr Pașaport": f"U{random.randint(10_000_000, 10_999_999)}",
         }
-        for _ in range(2)
+        for _ in range(n)
     ]
+
+
+async def start_registration_process(dt: date, tip_formular: int):
+
+    users_data = generate_fake_users_data()
     users_data = get_users_data_from_xslx()
 
     # while True:
