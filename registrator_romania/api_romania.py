@@ -467,7 +467,7 @@ async def registration(tip_formular: int, registration_date: datetime):
     report_tasks = []
     while True:
         dt = moscow_dt_now()
-        await asyncio.sleep(2)
+        await asyncio.sleep(1.5)
         places = await api.get_free_places_for_date(
             tip_formular=tip_formular,
             month=registration_date.month,
@@ -488,10 +488,20 @@ async def registration(tip_formular: int, registration_date: datetime):
                     tip_formular=tip_formular,
                 )
                 
+                username = us["Nume Pasaport"]
+
                 if api.is_success_registration(html):
                     successfully_registered.append(us)
+                else:
+                    error_text = api.get_error_registration_as_text(html)
+                    logger.info(
+                        f"{username} - {error_text}"
+                    )
+                    if error_text == "Data înregistrării este dezactivata":
+                        await asyncio.sleep(2)
+                        continue
                 
-                fn = f"{us["Nume Pasaport"]}-{time.time()}.html"
+                fn = f"{username}-{time.time()}.html"
                 with open(fn, "w") as f:
                     f.write(html)
 
