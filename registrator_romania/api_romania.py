@@ -482,10 +482,10 @@ async def registration(
                     tip_formular=tip_formular,
                 )
                 fn = f"{us["Nume Pasaport"]}-{time.time()}.html"
-                
+
                 with open(fn, "w") as f:
                     f.write(html)
-                    
+
                 asyncio.get_event_loop().create_task(
                     bot.send_msg_into_chat(
                         f"Успешная регистрация для {us["Nume Pasaport"]}!", fn
@@ -495,7 +495,7 @@ async def registration(
             except Exception as e:
                 logger.exception(e)
                 errors += 1
-        
+
         if not users_data:
             return
 
@@ -506,15 +506,26 @@ async def main():
     tip_formular = 5
     registration_date = datetime(year=year, month=month, day=datetime.now().day)
 
-    await registration(tip_formular, year, month, registration_date)
-    api = APIRomania()
+    # await registration(tip_formular, year, month, registration_date)
+    # api = APIRomania()
     # pool = await api.get_proxy_pool()
-    days = await api.get_free_days(
-        month=month, year=year, tip_formular=tip_formular
-    )
-    
-    print(days)
+    # days = await api.get_free_days(
+    #     month=month, year=year, tip_formular=tip_formular
+    # )
+    # print(days)
+
+    # day = days[0]
+    # places = await api.get_free_places_for_date(
+    #     tip_formular, month, registration_date.day, year
+    # )
+    # print(places)
+
+    # user_data = generate_fake_users_data()[0]
+    # print(user_data)
+    # await api.make_registration(user_data, registration_date, tip_formular)
+
     # users_data = get_users_data_from_xslx()
+    await registration(tip_formular, year, month, registration_date)
     # pprint(users_data)
     ...
 

@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" href="https://programarecetatenie.eu/public/assets/img/sigla_guv_coroana_albastru.png">
+        <!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">-->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css">
+        <link rel="stylesheet" href="https://programarecetatenie.eu/public/assets/css/style.css">
+        <script src='https://www.google.com/recaptcha/api.js?render=6LcnPeckAAAAABfTS9aArfjlSyv7h45waYSB_LwT'></script>
+        <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+        <!--<link href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.min.css" rel="stylesheet" />-->
+        <link href="https://cdn.datatables.net/1.11.3/css/dataTables.bootstrap5.min.css" rel="stylesheet" />
+        <link rel="stylesheet" href="https://cdn.datatables.net/buttons/1.6.2/css/buttons.dataTables.css" />
+        <link rel="stylesheet" href="https://cdn.datatables.net/select/1.3.1/css/select.dataTables.css" />
+        <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.5/css/responsive.dataTables.css" />
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" rel="stylesheet"/>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css" rel="stylesheet"/>
+
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js" ></script>        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+        <!--<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>-->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/locales/bootstrap-datepicker.ro.min.js" charset="UTF-8"></script>
+<!--        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.3.2/html2canvas.min.js" integrity="sha512-tVYBzEItJit9HXaWTPo8vveXlkK62LbA+wez9IgzjTmFNLMBO1BEYladBw2wnM3YURZSMUyhayPCoLtjGh84NQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>-->
+
+        <title>Programare online în vederea depunerii cererii de cetățenie la Autoritatea Națională pentru Cetățenie</title>
+
+    </head>
+    <body>
+                <div id="cookieNotice" class="light display-right" style="display: none;">
+            <div id="closeIcon" style="display: none;">
+            </div>
+            <div class="title-wrap">
+                <h4>Cookie Consent</h4>
+            </div>
+            <div class="content-wrap">
+                <div class="msg-wrap">
+                    <p>Acest website foloseste cookie-uri pentru a se asigura ca beneficiati de cea mai buna experienta de navigare.   <a target="_blank" style="color:#115cfa;" href="http://cetatenie.just.ro/regulament-de-programare-online-pentru-depunerea-dosarelor-privind-cetatenia-romana/">Mai mult</a></p>
+                    <div class="btn-wrap">
+                        <button class="btn-primary" onclick="acceptCookieConsent();">Accept</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-blue">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="https://programarecetatenie.eu/"><img class="logo" src="https://programarecetatenie.eu/public/assets/img/logo.png"></a>
+
+                <div class="header_2">
+                    <div style="" class="header-title" ><h5 style=" ">Programare online în vederea depunerii cererii de cetățenie la Autoritatea Națională pentru Cetățenie</h5>  </div>
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                        <ul class="navbar-nav mr-auto">
+                            <li class="nav-item active">
+            <a class="nav-link"  href="https://programarecetatenie.eu/programare_online">Programare Online</a>
+          </li><li class="nav-item ">
+            <a class="nav-link"  href="https://programarecetatenie.eu/verificare_programare">Lista programari online</a>
+          </li>                        </ul>
+                    </div>
+                </div>
+                <div class="navbar-brand" style="font-size: 16px;">
+                    <div class="steaguri_si_loguot">
+                        <ul class="navbar-nav my-2 my-lg-0">
+                            <li class="lang-item lang-item-49 lang-item-ro current-lang lang-item-first">
+                                <a class="lang" lang="ro-RO" hreflang="ro-RO" href="https://programarecetatenie.eu/lang/ro" role="link">
+                                    <img src="https://programarecetatenie.eu/public/assets/img/flag.png" alt="Română" width="16" height="11" style="width: 16px; height: 11px; margin-top: 13px">
+                                </a>
+                            </li>
+                            <li class="lang-item lang-item-52 lang-item-en">
+                                <a class="lang" lang="en-GB" hreflang="en-GB" href="https://programarecetatenie.eu/lang/en" role="link">
+                                    <img src="https://programarecetatenie.eu/public/assets/img/flag_en.png" alt="English" width="16" height="11" style="width: 16px; height: 11px; margin-top: 13px">
+                                </a>
+                            </li>
+                                                    </ul>
+                    </div>
+                                    </div>
+            </div>
+        </nav>
+<div class="container">
+
+    <div class="row">
+        <div class="col-12 col-md-12  mt-5 mb-5 pt-3 pb-3 bg-white from-wrapper">
+            <div class="container">
+                <form class="" id="formular" action="https://programarecetatenie.eu/programare_online" method="post" >
+                    <div class="row">
+                        <div class="col-12 col-sm-12">
+                            <div class="form-group">
+                                <div>
+                                    <div class="row">
+                                        <h3 style="text-align: center">Programare Online</h3>
+
+                                        <div class="col-sm-12">
+                                            <label for="tip_formular"> <b>Tip Programare</b>:</label>
+                                            <br/>
+                                            <select class="form-select select2" name="tip_formular" id="tip_formular" aria-label="Tip formular">
+                                                <option></option>
+                                                <option  selected=""  " value="5">BUCURESTI – FORMULAR PROGRAMARE ART. 11</option><option  " value="3">GALAȚI – FORMULAR PROGRAMARE ART. 11</option><option  " value="2">IAȘI – FORMULAR PROGRAMARE ART 11</option><option  " value="1">SUCEAVA – FORMULAR PROGRAMARE ART 11</option><option  " value="4">BUCURESTI – FORMULAR PROGRAMARE ART. 10</option><option  " value="6">BUCURESTI – FORMULAR PROGRAMARE ART. 8, 8.1</option><option  " value="7">BUCURESTI – FORMULAR PROGRAMARE ART.  27</option>                                            </select>
+                                            <!-- va fi un select nu input-->
+                                        </div>
+
+                                        <div class="col-sm-6">
+                                            <label for="nume_pasaport"><b>Nume Pasaport * </b>   :</label>
+                                            <!-- disable ctrl+v in input -->
+
+                                            <input autocomplete="off" type="text" class="form-control" name="nume_pasaport" id="nume_pasaport" pattern="[A-Za-z, ]+" title="Numele poate conține doar caractere alfabetice și/sau spațiu" value="ERHAN">
+                                            <label for="data_nasterii"><b>Data nasterii </b> :</label>
+                                            <div class="input-group date" data-provide="">
+                                                <input autocomplete="off" type="text" id="data_nasterii" name="data_nasterii" class="form-control datepicker" required value="1989-12-04">
+                                                <div class="input-group-addon">
+                                                    <!--<span class="glyphicon glyphicon-th"><i class="fa fa-calendar"></i></span>-->
+                                                </div>
+                                            </div>
+
+
+
+                                        </div>
+                                        <div class="col-sm-6"">
+
+                                            <label for="prenume_pasaport"><b>Prenume Pasaport  * </b>   :</label>
+                                            <input autocomplete="off" type="text" class="form-control" name="prenume_pasaport" id="prenume_pasaport" pattern="[A-Za-z, ]+" title="Prenume poate conține doar caractere alfabetice și/sau spațiu" value="MALAKCI">
+
+                                            <label for="locul_nasterii"><b>Locul Nasterii *  </b>  :</label>
+                                            <input autocomplete="off" type="text" class="form-control" name="locul_nasterii" id="locul_nasterii"  value="Bakirkoy">
+                                        </div>
+
+
+                                        <div class="col-sm-6" >
+
+                                            <label for="prenume_mama"><b>Prenume Mama * </b>   :</label>
+                                            <input autocomplete="off" type="text" class="form-control" name="prenume_mama" id="prenume_mama" pattern="[A-Za-z, ]+" title="Prenume mamă poate conține doar caractere alfabetice și/sau spațiu" value="Selime">
+                                        </div>
+                                        <div class="col-sm-6" >
+                                            <label for="prenume_tata"><b>Prenume Tata * </b>   :</label>
+                                            <input autocomplete="off" type="text" class="form-control" name="prenume_tata" id="prenume_tata" value="Necmettin">
+                                        </div>
+                                        <div class="col-sm-6" >
+                                            <label for="email"><b>Adresa de email  * </b>  :</label>
+                                            <input autocomplete="off" type="email" class="form-control" name="email" id="email"  value="erhanmalakci@gmail.com">
+                                        </div>
+                                        <div class="col-sm-6" >
+                                            <label for="numar_pasaport"><b>Serie și număr Pașaport  * </b>  :</label>
+                                            <input autocomplete="off" type="numar_pasaport" class="form-control" name="numar_pasaport" id="numar_pasaport"  value="">
+                                        </div>
+
+
+
+                                        <div class="col-sm-6">
+                                            <label for="data_programarii"><b>Data Programarii </b> :</label>
+                                            <!-- create a loading spinner for the calendar-->
+                                            <div id="custom_delay" class="loading" style="display: flex; justify-content: center; align-items: center; background: rgba(128, 128, 128, 0.5); position:absolute; z-index:9999; width:400px; height:300px;">
+                                                <div class="spinner-border text-primary" role="status" style="display: flex; justify-content: center; align-items: center;">
+                                                    <span class="sr-only">Loading...</span>
+                                                </div>
+                                            </div>
+                                            <div class="input-group date" data-provide="">
+                                                <div id="data_programarii"></div>
+                                                <input autocomplete="off" type="text" hidden="" id="data_programarii_input" name="data_programarii" class="form-control" required value="">
+                                                <div class="input-group-addon">
+                                                    <!--<span class="glyphicon glyphicon-th"><i class="fa fa-calendar"></i></span>-->
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-sm-6" id="cat_au_mai_ramas">
+
+                                        </div>
+                                        <div class="form-check mt-3">
+                                            <input  class="form-check-input" type="checkbox" name="gdpr" id="gdpr"  value="1" >
+                                            <label class="form-check-label" for="gdpr">
+   <strong>„<a href="http://cetatenie.just.ro/regulament-de-programare-online-pentru-depunerea-dosarelor-privind-cetatenia-romana/" target="_blank" rel="noopener noreferrer">Sunt de acord cu termenii și condițiile de utilizare ale formularului și prelucrarea datelor conform GDPR</a>"</strong>
+</label>
+                                        </div>
+
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-12 col-sm-4">
+                            <button id="transmite" type="submit" class="btn btn-primary">Transmite 
+                            <div id="spinner_button" class="spinner-border " role="status" style="display: inline-block; justify-content: center; align-items: center;width:20px; height:20px">
+                                <span class="sr-only">Loading...</span> 
+                            </div>
+                            </button>
+                        </div>
+
+                    </div>
+                <div style="display:none"><label>Fill This Field</label><input type="text" name="honeypot" value=""></div></form>
+                <div id="validation_box" class=" row">
+                                                            <div class="col-12">
+                                            <div id="error_div" style="padding-top: 20px" class="" role="">                                
+                                                <p class="alert alert-danger">Data înregistrării este dezactivata</p>                                            </divid>
+                                        </div>
+                                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+
+</style>
+
+<script>
+    $(document).ready(function () {
+        $('input').bind("cut copy paste", function (e) {
+            e.preventDefault();
+        });
+        $("#custom_delay").hide();
+        $("#transmite").prop('disabled', true);
+        $("#spinner_button").show();
+        setTimeout(function () {
+            $("#transmite").prop('disabled', false);
+            $("#custom_delay").hide();
+            $("#spinner_button").hide();
+        }, 30000);
+        var today = new Date();
+        var dd = today.getDate();
+        var mm = ("0" + (today.getMonth() + 1)).slice(-2);
+        var yyyy = today.getFullYear();
+        var azi = yyyy + "-" + mm;
+        //        console.log(azi);
+        //        console.log($('#validation_box .alert').hasClass('alert-success'));
+
+
+        $('#data_nasterii').datepicker({
+            format: 'yyyy-mm-dd',
+            endDate: '-1d',
+            datesDisabled: '-1d',
+            language: 'ro',
+            todayHighlight: true,
+            todayBtn: "linked"
+        });
+        $('input[name="data_nasterii"]').attr("placeholder", "an-luna-zi");
+        $('.datepicker').datepicker({
+            format: 'yyyy-mm-dd',
+            //                        startDate: '-3d',
+            language: 'ro',
+            todayHighlight: true,
+            todayBtn: "linked"
+        });
+        var tip_formular = $("#tip_formular option:selected").val();
+
+        if (tip_formular) {
+            var fd = new FormData();
+            fd.append("azi", azi);
+            fd.append("tip_formular", tip_formular);
+            $.ajax({
+                url: 'https://programarecetatenie.eu/status_zile',
+                type: "POST",
+                data: fd,
+                async: false,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    switch (tip_formular) {
+                        case '1':
+                            var days_disable = [0, 6];
+                            break;
+                        case '2':
+                            var days_disable = [0, 6];
+                            break;
+                        case '3':
+                            var days_disable = [0, 6];
+                            break;
+                        case '4':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '5':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '6':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '7':
+                            var days_disable = [0, 5, 6];
+                            break;
+                    }
+                    var datesForDisable = $.parseJSON(response).data;
+                    $('#data_programarii').datepicker("setDate", null);
+                    $('#data_programarii').datepicker("destroy");
+                    $('#data_programarii').datepicker({
+                        format: 'yyyy-mm-dd',
+                        startDate: '+2d',
+                        endDate: '+4m',
+                        language: 'ro',
+                        todayHighlight: false,
+                        todayBtn: "linked",
+                        datesDisabled: datesForDisable,
+                        daysOfWeekDisabled: days_disable,
+                        beforeShowDay: function (date) {
+
+                        },
+                        beforeShowMonth: function (date) {
+
+                        }
+                    });
+                },
+                error: function (jqXHR, textStatus, errorMessage) {
+                    (console.log(errorMessage)); // Optional
+                }
+            });
+        }
+
+        $('#data_programarii').hide();
+        if ($("#tip_formular").val() != '') {
+            $('#data_programarii').show();
+        }
+        $("#tip_formular").on("change", function () {
+            $("#custom_delay").show();
+            var tip_formular = $("#tip_formular option:selected").val();
+            //            console.log(tip_formular);
+            if (tip_formular !== null || tip_formular != '') {
+                $('#data_programarii').show();
+            } else {
+                $('#data_programarii').hide();
+            }
+            $("#cat_au_mai_ramas").html('');
+            var fd = new FormData();
+            fd.append("azi", azi);
+            fd.append("tip_formular", tip_formular);
+            $.ajax({
+                url: 'https://programarecetatenie.eu/status_zile',
+                type: "POST",
+                data: fd,
+                async: false,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    switch (tip_formular) {
+                        case '1':
+                            var days_disable = [0, 6];
+                            break;
+                        case '2':
+                            var days_disable = [0, 6];
+                            break;
+                        case '3':
+                            var days_disable = [0, 6];
+                            break;
+                        case '4':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '5':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '6':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '7':
+                            var days_disable = [0, 5, 6];
+                            break;
+                    }
+                    var datesForDisable = $.parseJSON(response).data;
+                    $('#data_programarii').datepicker("setDate", null);
+                    $('#data_programarii').datepicker("destroy");
+                    $('#data_programarii').datepicker({
+                        format: 'yyyy-mm-dd',
+                        startDate: '+2d',
+                        endDate: '+4m',
+                        language: 'ro',
+                        todayHighlight: false,
+                        todayBtn: "linked",
+                        datesDisabled: datesForDisable,
+                        daysOfWeekDisabled: days_disable,
+                        beforeShowDay: function (date) {
+
+                        },
+                        beforeShowMonth: function (date) {
+
+                        }
+                    });
+                },
+                error: function (jqXHR, textStatus, errorMessage) {
+                    (console.log(errorMessage)); // Optional
+                }
+            });
+            /* create a timeout of 10 secunde*/
+            setTimeout(function () {
+                $("#custom_delay").hide();
+            }, 5100);
+        });
+        $('#data_programarii').datepicker({
+
+        }).on('changeDate', function (date) {
+            if ($('#error_div').find('.alert-danger').length > 0) {
+                $("#custom_delay").show();
+                $("#transmite").prop('disabled', true);
+                setTimeout(function () {
+                    $("#transmite").prop('disabled', false);
+                    $("#custom_delay").hide();
+                }, 5100);
+            }
+
+            var d = new Date(date.date);
+            var azi_selectat = d.toLocaleString("default", { year: "numeric" }) + "-" + d.toLocaleString("default", { month: "2-digit" }) + "-" + d.toLocaleString("default", { day: "2-digit" });
+            var tip_formular = $("#tip_formular option:selected").val();
+            //            console.log(azi_selectat);
+            $('input[name=data_programarii]').val(azi_selectat);
+            var fd = new FormData();
+            fd.append("azi", azi_selectat);
+            fd.append("tip_formular", tip_formular);
+            $.ajax({
+                url: 'https://programarecetatenie.eu/status_zii',
+                type: "POST",
+                data: fd,
+                async: false,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    //                    console.log($.parseJSON(response).numar_ramase);
+                    if (azi_selectat != 'Invalid Date-Invalid Date-Invalid Date') {
+                        html = "<p>Total Programari ramase in data de <i>'" + azi_selectat + "'</i> : <b>" + $.parseJSON(response).numar_ramase + "</b></p>";
+                        $("#cat_au_mai_ramas").html(html);
+                    }
+                },
+                error: function (jqXHR, textStatus, errorMessage) {
+                    (console.log(errorMessage)); // Optional
+                }
+            });
+        }).on('changeMonth', function (date) {
+            $("#custom_delay").show();
+            var d = new Date(date.date);
+            //            console.log(d.toLocaleString("default", { year: "numeric" }));
+            var azi_temp = d.toLocaleString("default", { year: "numeric" }) + "-" + d.toLocaleString("default", { month: "2-digit" });
+            //            console.log(azi_temp);
+            var tip_formular = $("#tip_formular option:selected").val();
+            var fd = new FormData();
+            fd.append("azi", azi_temp);
+            fd.append("tip_formular", tip_formular);
+            $.ajax({
+                url: 'https://programarecetatenie.eu/status_zile',
+                type: "POST",
+                data: fd,
+                async: false,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    var datesForDisable = $.parseJSON(response).data;
+                    switch (tip_formular) {
+                        case '1':
+                            var days_disable = [0, 6];
+                            break;
+                        case '2':
+                            var days_disable = [0, 6];
+                            break;
+                        case '3':
+                            var days_disable = [0, 6];
+                            break;
+                        case '4':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '5':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '6':
+                            var days_disable = [0, 5, 6];
+                            break;
+                        case '7':
+                            var days_disable = [0, 5, 6];
+                            break;
+                    }
+                    //                    console.log(datesForDisable);
+                    $('#data_programarii').datepicker("setDate", null);
+                    $('#data_programarii').datepicker("destroy");
+                    $('#data_programarii').datepicker({
+                        format: 'yyyy-mm-dd',
+                        defaultViewDate: azi_temp + "-01",
+                        startDate: '+2d',
+                        endDate: '+4m',
+                        language: 'ro',
+                        todayHighlight: false,
+                        todayBtn: "linked",
+                        datesDisabled: datesForDisable,
+                        daysOfWeekDisabled: days_disable,
+                        beforeShowDay: function (date) {
+
+                        },
+                        beforeShowMonth: function (date) {
+
+                        }
+                    });
+                },
+                error: function (jqXHR, textStatus, errorMessage) {
+                    (console.log(errorMessage)); // Optional
+                }
+            });
+            setTimeout(function () {
+                $("#custom_delay").hide();
+            }, 5100);
+        });
+        $(".select2").select2({
+            placeholder: "Alege tipul programarii",
+            allowClear: false,
+            width: '100%'
+        });
+        if ($('#validation_box .alert').hasClass('alert-success')) {
+            $('#formular').hide();
+        } else {
+            $('#formular').show();
+        }
+    });
+</script>
+
+</body>
+
+<script>
+    $ = jQuery;
+    $(".lang").click(function (e) {
+        var href = $(this).attr('href');
+        e.preventDefault();
+        $.get(href, function () {
+            location.reload();
+        });
+    });
+
+    $(document).ready(function () {
+
+        $('.user_type_select').select2({
+            widht: '100%',
+        });
+        $("form").submit(function (e) {
+            e.preventDefault();
+            var formul = $(this);
+            grecaptcha.ready(function () {
+                grecaptcha.execute('6LcnPeckAAAAABfTS9aArfjlSyv7h45waYSB_LwT', {action: 'submit'}).then(function (token) {
+                    // Add your logic to submit to your backend server here.
+                    $("<input />").attr("type", "hidden")
+                            .attr("name", "g-recaptcha-response")
+                            .attr("value", token)
+                            .appendTo(formul);
+                    formul.unbind('submit').submit();
+                });
+            });
+        });
+    });
+    // Create cookie
+    function setCookie(cname, cvalue, exdays) {
+        const d = new Date();
+        d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+        let expires = "expires=" + d.toUTCString();
+        document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+    }
+
+// Delete cookie
+    function deleteCookie(cname) {
+        const d = new Date();
+        d.setTime(d.getTime() + (24 * 60 * 60 * 1000));
+        let expires = "expires=" + d.toUTCString();
+        document.cookie = cname + "=;" + expires + ";path=/";
+    }
+
+// Read cookie
+    function getCookie(cname) {
+        let name = cname + "=";
+        let decodedCookie = decodeURIComponent(document.cookie);
+        let ca = decodedCookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) == ' ') {
+                c = c.substring(1);
+            }
+            if (c.indexOf(name) == 0) {
+                return c.substring(name.length, c.length);
+            }
+        }
+        return "";
+    }
+
+// Set cookie consent
+    function acceptCookieConsent() {
+        deleteCookie('user_cookie_consent');
+        setCookie('user_cookie_consent', 1, 30);
+        document.getElementById("cookieNotice").style.display = "none";
+    }
+    let cookie_consent = getCookie("user_cookie_consent");
+    if (cookie_consent != "") {
+        document.getElementById("cookieNotice").style.display = "none";
+    } else {
+        document.getElementById("cookieNotice").style.display = "block";
+    }
+
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+</script>
+</html>
