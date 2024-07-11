@@ -502,17 +502,18 @@ async def registration(
 
 async def main():
     year = 2024
-    month = 11
-    tip_formular = 3
+    month = 10
+    tip_formular = 5
     registration_date = datetime(year=year, month=month, day=datetime.now().day)
 
     await registration(tip_formular, year, month, registration_date)
-    # api = APIRomania()
+    api = APIRomania()
     # pool = await api.get_proxy_pool()
-    # days = await api.get_free_days(
-    #     month=month, year=year, tip_formular=tip_formular
-    # )
-    # print(days)
+    days = await api.get_free_days(
+        month=month, year=year, tip_formular=tip_formular
+    )
+    
+    print(days)
     # users_data = get_users_data_from_xslx()
     # pprint(users_data)
     ...

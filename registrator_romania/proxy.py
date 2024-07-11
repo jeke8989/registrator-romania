@@ -11,6 +11,7 @@ from pprint import pprint
 import queue
 import random
 from functools import wraps
+import re
 import socket
 import threading
 import traceback
@@ -171,19 +172,6 @@ def run_th(proxies: list[str], q: multiprocessing.Queue):
     loop.close()
 
 
-<<<<<<< Updated upstream
-class FilterProxies:
-    def __init__(
-        self,
-        pr: multiprocessing.Process,
-        q: multiprocessing.Queue,
-        e: multiprocessing.Event,
-        debug: bool = False,
-    ) -> None:
-        self._process = pr
-        self._queue = q
-        self._event = e
-=======
 class AutomaticProxyPool:
     def __init__(
         self,
@@ -198,13 +186,10 @@ class AutomaticProxyPool:
         self._process: multiprocessing.Process = None
         self._queue = multiprocessing.Queue()
         self._event = multiprocessing.Event()
->>>>>>> Stashed changes
         self._pool = AiohttpSession().generate_connector()
         self._proxies = []
         self._proxies_reports = {}
         self.debug = debug
-<<<<<<< Updated upstream
-=======
         self._append_pool_task: asyncio.Task = None
         self._src_proxies_list = proxies
         self._do_second_check = second_check
@@ -242,7 +227,6 @@ class AutomaticProxyPool:
         loop = asyncio.new_event_loop()
         loop.run_until_complete(add_new_proxies_async())
         loop.close()
->>>>>>> Stashed changes
 
     def __aiter__(self):
         return self
@@ -261,35 +245,15 @@ class AutomaticProxyPool:
 
     async def _append_pool(self):
         async def send_request(proxy: str):
-<<<<<<< Updated upstream
-            net_errors = (
-                aiohttp.ClientProxyConnectionError,
-                aiohttp.ClientConnectionError,
-                aiohttp.ServerDisconnectedError,
-                aiohttp.ClientHttpProxyError,
-                aiohttp.ClientOSError,
-                asyncio.TimeoutError,
-            )
-            
-=======
             if proxy in self.proxies:
                 return
 
->>>>>>> Stashed changes
             async with AiohttpSession().generate(
                 connector=self._pool, total_timeout=7
             ) as session:
                 if self.debug:
                     logger.debug(f"append_pool: {proxy}")
                 try:
-<<<<<<< Updated upstream
-                    async with session.get(
-                        "https://api.ipify.org", proxy=proxy
-                    ):
-                        stop = datetime.datetime.now()
-                        if self.debug:
-                            logger.debug(f"Second check was successfully: {proxy} - {start - stop}")
-=======
                     if self._do_second_check:
                         start = datetime.datetime.now()
                         async with session.get(
@@ -301,7 +265,6 @@ class AutomaticProxyPool:
                                     "Second check was successfully: "
                                     f"{proxy} - {start - stop}"
                                 )
->>>>>>> Stashed changes
                     self._proxies.append(proxy)
                     self.proxy_working(proxy)
                 except AIOHTTP_NET_ERRORS:
@@ -319,38 +282,6 @@ class AutomaticProxyPool:
 
                 await asyncio.gather(*tasks)
 
-<<<<<<< Updated upstream
-        asyncio.get_event_loop().create_task(background())
-
-    async def __anext__(self):
-        q = self._queue
-
-        if self._event.is_set() and q.empty():
-            if self.debug:
-                logger.debug("StopAsyncIteration")
-            q.close()
-
-            del self._queue
-            del self._process
-
-            raise StopAsyncIteration
-
-        try:
-            result = await asyncio.to_thread(q.get)
-        except Exception as e:
-            logger.critical(traceback.format_exc(e))
-        else:
-            if isinstance(result, tuple):
-                time = result[2]
-                proxy = result[1]
-                if self.debug:
-                    logger.debug(f"__anext__: {proxy}")
-
-                return proxy, time
-
-    async def __aenter__(self):
-        return self
-=======
         self._append_pool_task = asyncio.get_event_loop().create_task(
             background()
         )
@@ -385,7 +316,6 @@ class AutomaticProxyPool:
     def restart_background(self):
         self.drop_background()
         self.start_background()
->>>>>>> Stashed changes
 
     def drop_background(self):
         self._event.set()
@@ -396,8 +326,6 @@ class AutomaticProxyPool:
 
         del self._queue
         del self._process
-<<<<<<< Updated upstream
-=======
         self._queue = multiprocessing.Queue()
         self._process = None
 
@@ -428,7 +356,6 @@ class AutomaticProxyPool:
             target=run, args=(self._queue, self._src_proxies_list, self._event)
         )
         self._process.start()
->>>>>>> Stashed changes
 
     @property
     def proxies(self):
@@ -445,23 +372,6 @@ class AutomaticProxyPool:
         self_class = self
   
         async def _request(*args, **kwargs):
-<<<<<<< Updated upstream
-            proxy_exceptions = (
-                aiohttp.ClientProxyConnectionError,
-                aiohttp.client_exceptions.ContentTypeError,
-                aiohttp.client_exceptions.ClientConnectionError,
-                aiohttp.client_exceptions.ClientHttpProxyError,
-                aiohttp.client_exceptions.ClientProxyConnectionError,
-                aiohttp.client_exceptions.ClientResponseError,
-                asyncio.TimeoutError
-            )
-            proxy = kwargs.get("proxy")
-            url = args[1]
-            
-            if self_class.debug and proxy:
-                logger.debug(f"Do request on {url} with proxy {proxy}")
-                
-=======
             proxy = kwargs.get("proxy")
             url = args[1]
 
@@ -475,7 +385,6 @@ class AutomaticProxyPool:
             start = datetime.datetime.now()
             if proxy:
                 self_class._last_proxy_used = proxy
->>>>>>> Stashed changes
             try:
                 result = await session._request_(*args, **kwargs)
                 stop = datetime.datetime.now()
@@ -499,10 +408,6 @@ class AutomaticProxyPool:
         
         session._request_ = session._request
         session._request = _request
-<<<<<<< Updated upstream
-        
-        return session, self.proxies
-=======
 
         return session
 
@@ -526,7 +431,6 @@ class AutomaticProxyPool:
                 *[send_req(proxy) for proxy in proxies]
             )
         return [result[1] for result in results if result[0]]
->>>>>>> Stashed changes
 
     def proxy_not_working(self, proxy: str):
         if proxy not in self.proxies:
@@ -573,70 +477,11 @@ def divide_list(src_list: list, divides: int = 100):
 
 
 async def filter_proxies(proxies: list[str], debug: bool = False):
-<<<<<<< Updated upstream
-    q = multiprocessing.Queue()
-    event = multiprocessing.Event()
-
-    def run(
-        q: multiprocessing.Queue,
-        proxies: list[str],
-        event: multiprocessing.Event,
-    ):
-        divides = 1000
-        chunks = divide_list(proxies, divides=divides)
-
-        with ThreadPoolExecutor(max_workers=os.cpu_count() ** 2) as e:
-            e.map(run_th, chunks, [q for _ in chunks])
-
-        event.set()
-
-    pr = multiprocessing.Process(target=run, args=(q, proxies, event))
-    pr.start()
-
-    f = FilterProxies(pr, q, event, debug=debug)
-=======
     f = AutomaticProxyPool(proxies, debug=debug, second_check=True)
->>>>>>> Stashed changes
     await f
     return f
 
 
-<<<<<<< Updated upstream
-class Proxysio:
-    """
-    Documentation - https://proxys.io/ru/api/v2/doc
-    """
-
-    def __init__(self) -> None:
-        cfg = config.get_config()
-        self._api_key = cfg["proxysio"]["api_key"]
-        self._base_url = "https://proxys.io/ru/api/v2"
-
-    async def list_proxy(
-        self, scheme: Literal["http", "https"] = "http"
-    ) -> list[str]:
-        url = self._base_url + f"/ip?key={self._api_key}"
-
-        @aiohttp_session()
-        async def request(session: aiohttp.ClientSession):
-            resp = await session.get(url)
-            return await resp.json()
-
-        # response = await request()
-        response = ["http://tBO8tjSZXj:M64o9nRlGo@65.21.25.28:1033"]
-        logger.debug(f"Proxysio list_proxy: \n{response}")
-        return response
-        # _key = f"port_{scheme}"
-        # user = response["data"][0]["username"]
-        # password = response["data"][0]["password"]
-        # return [
-        #     f"{scheme}://{user}:{password}@{obj["ip"]}:{obj[_key]}"
-        #     for obj in response["data"][0]["list_ip"]
-        # ]
-
-
-class ProxyMaster:
-=======
 class AnyProxy(ABC):
     @abstractmethod
     async def list_proxy(self):
@@ -644,7 +489,6 @@ class AnyProxy(ABC):
 
 
 class ProxyMaster(AnyProxy):
->>>>>>> Stashed changes
     """
     Github - https://github.com/MuRongPIG/Proxy-Master
     """
@@ -670,9 +514,6 @@ class FreeProxies(AnyProxy):
                 return [f"http://{p.strip()}" for p in proxies.splitlines()]
 
 
-<<<<<<< Updated upstream
-class GeoNode:
-=======
 class FreeProxiesList(AnyProxy):
     """
     GitHub - https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt
@@ -687,7 +528,6 @@ class FreeProxiesList(AnyProxy):
 
 
 class GeoNode(AnyProxy):
->>>>>>> Stashed changes
     async def list_proxy(self) -> list[str]:
         headers = {
             "accept": "application/json, text/plain, */*",
@@ -713,37 +553,6 @@ class GeoNode(AnyProxy):
                 ]
 
 
-<<<<<<< Updated upstream
-async def main():
-    p = ProxyMaster()
-    proxies = await p.list_proxy()
-    # proxies = proxies + await FreeProxies().list_proxy()
-    p = GeoNode()
-    proxies = await p.list_proxy() + await FreeProxies().list_proxy()
-    print(f"Raw proxies: {len(proxies)}")
-
-    filtered = await filter_proxies(proxies)
-    while True:
-        await asyncio.sleep(2)
-        pprint(filtered.proxies)
-        if not filtered.proxies:
-            continue
-
-        session, proxies = await filtered.get_session()
-        proxy = random.choice(proxies)
-        try:
-            async with session:
-                async with session.get(
-                    "https://icanhazip.com", proxy=proxy
-                ) as resp:
-                    logger.success(f"Proxy {proxy}:", await resp.text())
-                    filtered.proxy_working(proxy)
-        except Exception as e:
-            logger.warning(
-                f"icanhazip.com: {e}. proxy {proxy} not working", flush=True
-            )
-            filtered.proxy_not_working(proxy)
-=======
 class ImRavzanProxyList(AnyProxy):
     """
     https://raw.githubusercontent.com/im-razvan/proxy_list/main/http.txt
@@ -890,7 +699,6 @@ async def main():
             stop - start,
             f"\nwork only {works_num} proxies\n\n",
         )
->>>>>>> Stashed changes
 
 
 if __name__ == "__main__":
