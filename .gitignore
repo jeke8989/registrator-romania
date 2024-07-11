@@ -6,7 +6,7 @@ __pycache__/
 romania-registrator-app.json
 videos/
 spr.json
-user_*.html
+*.html
 .*~lock.*
 
 # C extensions
