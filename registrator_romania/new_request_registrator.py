@@ -1,6 +1,7 @@
 import asyncio
 from datetime import date, datetime
 import json
+from pprint import pprint
 import random
 import string
 import traceback
@@ -338,23 +339,27 @@ def error_handler(f):
     return wrapper
 
 
-async def start_registration_process(dt: date, tip_formular: int):
+def generate_fake_users_data(n: int = 20):
     def random_string(n: int = 5):
         return "".join(random.choice(string.ascii_uppercase) for _ in range(n))
 
-    users_data = [
+    return [
         {
-            "Nume Pasaport": f"P{random_string(2)}IR",
-            "Prenume Pasaport": f"{random_string(2)}DRI",
-            "Data nasterii": f"199{random.randint(0, 9)}-10-1{random.randint(0, 9)}",
-            "Locul naşterii": f"SI{random_string(1)}RI",
-            "Prenume Mama": f"REC{random_string(1)}YE",
-            "Prenume Tata": "SABRI",
-            "Adresa de email": f"{random_string()}@gmail.com",
-            "Serie și număr Pașaport": f"U{random.randint(10_000_000, 10_999_999)}",
+            "Nume Pasaport": f"A{random_string(2)}GAN",
+            "Prenume Pasaport": f"A{random_string(2)}GLU",
+            "Data nasterii": f"199{random.randint(0, 9)}-10-2{random.randint(0, 9)}",
+            "Locul naşterii": f"K{random_string(2)}KOY",
+            "Prenume Mama": f"SAFIYE",
+            "Prenume Tata": f"RAMAZAN",
+            "Adresa de email": f"{random_string(10)}@gmail.com",
+            "Serie și număr Pașaport": f"S{random.randint(10_000_000, 10_999_999)}",
         }
-        for _ in range(2)
+        for _ in range(n)
     ]
+
+
+async def start_registration_process(dt: date, tip_formular: int):
+    users_data = generate_fake_users_data()
     users_data = get_users_data_from_xslx()
 
     # while True:

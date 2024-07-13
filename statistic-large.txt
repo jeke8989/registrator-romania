@@ -243,3 +243,5 @@
 2024-07-11 00:12:04.917304 Works 1215 proxy. Total - 1427 proxies. Working 85.1436580238262%Requests was send at 0:00:08.017356
 2024-07-11 00:12:28.918278 Works 1225 proxy. Total - 1433 proxies. Working 85.48499651081647%Requests was send at 0:00:07.992942
 2024-07-11 00:13:48.915150 Works 1228 proxy. Total - 1446 proxies. Working 84.92392807745505%Requests was send at 0:00:07.981202
+2024-07-11 01:22:44.196148 Works 12 proxy. Total - 109 proxies. Working 11.009174311926607%Requests was send at 0:00:05.866345
+2024-07-11 01:22:50.200401 Works 65 proxy. Total - 171 proxies. Working 38.01169590643275%Requests was send at 0:00:06.002407
