@@ -19,6 +19,7 @@ from registrator_romania.new_request_registrator import (
     generate_fake_users_data,
     get_users_data_from_xslx,
 )
+from registrator_romania.parser import get_users_data_from_docx
 from registrator_romania.proxy import (
     AIOHTTP_NET_ERRORS,
     AiohttpSession,
@@ -460,7 +461,8 @@ class APIRomania:
 
 async def registration(tip_formular: int, registration_date: datetime):
     api = APIRomania()
-    users_data = get_users_data_from_xslx()
+    # users_data = get_users_data_from_xslx()
+    users_data = get_users_data_from_docx()
     # pool = await api.get_proxy_pool()
     proxies = []
     successfully_registered = []
@@ -487,20 +489,18 @@ async def registration(tip_formular: int, registration_date: datetime):
                     registration_date=registration_date,
                     tip_formular=tip_formular,
                 )
-                
+
                 username = us["Nume Pasaport"]
 
                 if api.is_success_registration(html):
                     successfully_registered.append(us)
                 else:
                     error_text = api.get_error_registration_as_text(html)
-                    logger.info(
-                        f"{username} - {error_text}"
-                    )
+                    logger.info(f"{username} - {error_text}")
                     if error_text == "Data înregistrării este dezactivata":
                         await asyncio.sleep(2)
                         continue
-                
+
                 fn = f"{username}-{time.time()}.html"
                 with open(fn, "w") as f:
                     f.write(html)
@@ -514,13 +514,13 @@ async def registration(tip_formular: int, registration_date: datetime):
             except Exception as e:
                 logger.exception(e)
                 errors += 1
-        
+
         if len(successfully_registered) == len(users_data):
             break
-        
+
         if dt.hour == 9 and dt.minute >= 1:
             break
-    
+
     for task in report_tasks:
         await task
         await asyncio.sleep(3)
@@ -557,7 +557,7 @@ async def main():
 
     # users_data = get_users_data_from_xslx()
     await registration(tip_formular, registration_date)
-    # pprint(users_data)    
+    # pprint(users_data)
     ...
 
 
