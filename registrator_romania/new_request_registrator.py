@@ -274,6 +274,7 @@ def prepare_users_data(users_data: list[dict]):
         obj = {}
         for k, v in us_data.items():
             # Replace values like `Doğum tarihi:09.09.1976`
+            v = v or ""
             v = v.split(":")[-1].strip()
             # Change turkey letters on english letters
             v = Transliterator("tr").transliterate(v)
@@ -345,11 +346,11 @@ def generate_fake_users_data(n: int = 20):
 
     return [
         {
-            "Nume Pasaport": f"A{random_string(2)}GAN",
-            "Prenume Pasaport": f"A{random_string(2)}GLU",
+            "Nume Pasaport": f"YUKSE{random_string(1)}OGLU",
+            "Prenume Pasaport": f"EMB{random_string(1)}YE",
             "Data nasterii": f"199{random.randint(0, 9)}-10-2{random.randint(0, 9)}",
-            "Locul naşterii": f"K{random_string(2)}KOY",
-            "Prenume Mama": f"SAFIYE",
+            "Locul naşterii": f"ISTANBUL",
+            "Prenume Mama": f"SA{random_string(2)}YE",
             "Prenume Tata": f"RAMAZAN",
             "Adresa de email": f"{random_string(10)}@gmail.com",
             "Serie și număr Pașaport": f"S{random.randint(10_000_000, 10_999_999)}",

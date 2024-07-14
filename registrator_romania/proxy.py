@@ -17,7 +17,9 @@ import socket
 import threading
 import time
 import traceback
-from typing import TYPE_CHECKING, List, Literal
+from typing import TYPE_CHECKING, List, Literal, Type
+from warnings import warn
+import warnings
 import aiohttp.client_exceptions
 from loguru import logger
 
@@ -102,17 +104,11 @@ async def check_proxy(
     timeout: int = None,
     close_connector: bool = False,
 ) -> dict:
-    url = "https://api.ipify.org?format=json"
+    url = "https://api.ipify.org"
 
-    net_errors = (
-        aiohttp.ClientProxyConnectionError,
-        aiohttp.ClientConnectionError,
-        aiohttp.ServerDisconnectedError,
-        aiohttp.ClientResponseError,
-        aiohttp.ClientHttpProxyError,
-        aiohttp.ClientOSError,
-        asyncio.TimeoutError,
-    )
+    if proxy.startswith("socks"):
+        connector = ProxyConnector.from_url(proxy)
+        # proxy = None
 
     async with AiohttpSession().generate(
         close_connector=close_connector,
@@ -122,16 +118,15 @@ async def check_proxy(
         try:
             start = datetime.datetime.now()
             async with session.get(url, proxy=proxy) as resp:
-                ...
                 result = (
-                    await resp.json(),
+                    await resp.text(),
                     proxy,
                     datetime.datetime.now() - start,
                 )
                 if queue:
                     await asyncio.to_thread(queue.put, result, block=False)
                 return result
-        except net_errors:
+        except AIOHTTP_NET_ERRORS:
             return tuple()
         except UnicodeError:
             return tuple()
@@ -187,6 +182,9 @@ class AutomaticProxyPool:
         proxies: list[str],
         debug: bool = False,
         second_check: bool = False,
+        sources_classes: list[Type] = None,
+        second_check_url: str = None,
+        second_check_headers: dict = None,
     ) -> None:
         self._scheduler = BackgroundScheduler()
         self._scheduler.add_job(self._add_new_proxies, "interval", minutes=10)
@@ -215,6 +213,9 @@ class AutomaticProxyPool:
         # Example:
         # [{"https://url1.com": {"proxy": "https://proxy:8080", "timeout": 2}}]
         # timeout in seconds
+        self._sources_cls = [] if not sources_classes else sources_classes
+        self._second_check_url = second_check_url or "https://api.ipify.org"
+        self._second_check_headers = second_check_headers or {"Accept": "*/*"}
 
     @property
     def last_proxy_used(self):
@@ -222,17 +223,18 @@ class AutomaticProxyPool:
 
     def _add_new_proxies(self):
         async def add_new_proxies_async():
-            proxies_classes = (
+            proxies_classes = self._sources_cls or (
                 GeoNode(),
                 FreeProxies(),
                 FreeProxiesList(),
                 ImRavzanProxyList(),
                 LionKingsProxy(),
+                TheSpeedX(),
                 ProxyMaster(),
             )
             for proxy_class in proxies_classes:
                 try:
-                    proxies = await proxy_class.list_proxy()
+                    proxies = await proxy_class.list_socks5_proxy()
                 except Exception:
                     continue
                 else:
@@ -270,15 +272,18 @@ class AutomaticProxyPool:
                 return
 
             async with AiohttpSession().generate(
-                connector=self._pool, total_timeout=7
+                connector=self._pool, total_timeout=4
             ) as session:
+                session._default_headers = self._second_check_headers
+
                 if self.debug:
                     logger.debug(f"append_pool: {proxy}")
+
                 try:
                     if self._do_second_check:
                         start = datetime.datetime.now()
                         async with session.get(
-                            "https://api.ipify.org", proxy=proxy
+                            self._second_check_url, proxy=proxy
                         ):
                             stop = datetime.datetime.now()
                             if self.debug:
@@ -364,7 +369,7 @@ class AutomaticProxyPool:
             proxies: list[str],
             event: multiprocessing.Event,
         ):
-            divides = 1500
+            divides = 700
             # proxies [0, 0, 0, 0, 0, 0]
             # divides: 2, chunks [[0, 0], [0, 0], [0, 0]]
             chunks = divide_list(proxies, divides=divides)
@@ -395,7 +400,7 @@ class AutomaticProxyPool:
     def set_proxies_for_url(self, list_of_proxies: list[str]):
         self._proxy_for["proxies"] = list_of_proxies
 
-    def _filter_proxies_by_timeout(self, proxies: list[dict[str, str | int]]):
+    def sort_proxies_by_timeout(self, proxies: list[dict[str, str | int]]):
         filtered = list(sorted(proxies, key=lambda p: p["timeout"]))
         return filtered
 
@@ -435,17 +440,17 @@ class AutomaticProxyPool:
                         if proxies:
                             # Set the most speed proxy
                             set_ = True
-                            proxies = self_class._filter_proxies_by_timeout(
+                            proxies = self_class.sort_proxies_by_timeout(
                                 proxies
                             )
-                            proxy = proxies[0]["proxy"]
+                            proxy = proxies.pop(0)["proxy"]
                             self_class._urls[url] = proxies
 
                             kwargs["proxy"] = proxy
 
                     elif self_class._urls[url]:
                         set_ = True
-                        proxy = self_class._urls[url][0]["proxy"]
+                        proxy = self_class._urls[url].pop(0)["proxy"]
                         kwargs["proxy"] = proxy
 
             if self_class.debug and proxy:
@@ -455,13 +460,13 @@ class AutomaticProxyPool:
                 async with session._lock:
                     tsk = asyncio.current_task()
                     msg = f", task - {tsk.get_name()}" if tsk else ""
-                    print(f"{proxy}, set for url: {set_}{msg}")
+                    # print(f"{proxy}, set for url: {set_}{msg}")
                     self_class._last_proxy_used = proxy
 
             start = datetime.datetime.now()
             try:
-                async with asyncio.Semaphore(8):
-                    result = await session._request_(*args, **kwargs)
+                # async with asyncio.Semaphore(8):
+                result = await session._request_(*args, **kwargs)
                 stop = datetime.datetime.now()
 
                 if proxy:
@@ -492,7 +497,7 @@ class AutomaticProxyPool:
                             "proxy": proxy,
                             "timeout": (stop - start).microseconds,
                         }
-                        new_list = self_class._filter_proxies_by_timeout(
+                        new_list = self_class.sort_proxies_by_timeout(
                             proxies=list_proxies_for_url
                         )
                         async with session._lock:
@@ -615,10 +620,15 @@ async def filter_proxies(proxies: list[str], debug: bool = False):
     return f
 
 
-class AnyProxy(ABC):
-    @abstractmethod
-    async def list_proxy(self):
-        raise NotImplementedError
+class AnyProxy:
+    async def list_http_proxy(self):
+        return []
+
+    async def list_socks4_proxy(self):
+        return []
+
+    async def list_socks5_proxy(self):
+        return []
 
 
 class ProxyMaster(AnyProxy):
@@ -626,12 +636,26 @@ class ProxyMaster(AnyProxy):
     Github - https://github.com/MuRongPIG/Proxy-Master
     """
 
-    async def list_proxy(self) -> list[str]:
+    async def list_http_proxy(self) -> list[str]:
         url = "https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/http.txt"
         async with AiohttpSession().generate(close_connector=True) as session:
             async with session.get(url) as resp:
                 proxies = await resp.text()
                 return [f"http://{p.strip()}" for p in proxies.splitlines()]
+
+    async def list_socks4_proxy(self) -> list[str]:
+        url = "https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/socks4.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"socks4://{p.strip()}" for p in proxies.splitlines()]
+
+    async def list_socks5_proxy(self) -> list[str]:
+        url = "https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/socks5.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"socks5://{p.strip()}" for p in proxies.splitlines()]
 
 
 class FreeProxies(AnyProxy):
@@ -639,12 +663,26 @@ class FreeProxies(AnyProxy):
     Github - https://github.com/Anonym0usWork1221/Free-Proxies
     """
 
-    async def list_proxy(self) -> list[str]:
+    async def list_http_proxy(self) -> list[str]:
         url = "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/http_proxies.txt"
         async with AiohttpSession().generate(close_connector=True) as session:
             async with session.get(url) as resp:
                 proxies = await resp.text()
                 return [f"http://{p.strip()}" for p in proxies.splitlines()]
+
+    async def list_socks4_proxy(self) -> list[str]:
+        url = "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/socks4_proxies.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"socks4://{p.strip()}" for p in proxies.splitlines()]
+
+    async def list_socks5_proxy(self) -> list[str]:
+        url = "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/socks5_proxies.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"socks5://{p.strip()}" for p in proxies.splitlines()]
 
 
 class FreeProxiesList(AnyProxy):
@@ -652,30 +690,30 @@ class FreeProxiesList(AnyProxy):
     GitHub - https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt
     """
 
-    async def list_proxy(self) -> list[str]:
+    async def list_http_proxy(self) -> list[str]:
         url = "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt"
         async with AiohttpSession().generate(close_connector=True) as session:
             async with session.get(url) as resp:
                 proxies = await resp.text()
                 return [f"http://{p.strip()}" for p in proxies.splitlines()]
 
+    async def list_socks4_proxy(self) -> list[str]:
+        url = "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/socks4.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"socks4://{p.strip()}" for p in proxies.splitlines()]
+
+    async def list_socks5_proxy(self) -> list[str]:
+        url = "https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/socks5.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"socks5://{p.strip()}" for p in proxies.splitlines()]
+
 
 class GeoNode(AnyProxy):
-    async def list_proxy(self) -> list[str]:
-        headers = {
-            "accept": "application/json, text/plain, */*",
-            "accept-language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,my;q=0.6",
-            "if-none-match": 'W/"b639-iIGkdAHjH3G4RBuh+yrCCEnidm4"',
-            "origin": "https://geonode.com",
-            "priority": "u=1, i",
-            "referer": "https://geonode.com/",
-        }
-
-        ua = ua_generator.generate().headers.get()
-
-        for k, v in ua.items():
-            headers[k] = v
-
+    async def list_http_proxy(self) -> list[str]:
         url = "https://proxylist.geonode.com/api/proxy-list?protocols=http&limit=500&sort_by=lastChecked&sort_type=desc"
         async with AiohttpSession().generate(close_connector=True) as session:
             async with session.get(url) as resp:
@@ -685,18 +723,48 @@ class GeoNode(AnyProxy):
                     for obj in response["data"]
                 ]
 
+    async def list_socks4_proxy(self) -> list[str]:
+        url = "https://proxylist.geonode.com/api/proxy-list?protocols=socks4&limit=500&sort_by=lastChecked&sort_type=desc"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                response = await resp.json()
+                return [
+                    f"socks4://{obj["ip"]}:{obj["port"]}"
+                    for obj in response["data"]
+                ]
+
+    async def list_socks5_proxy(self) -> list[str]:
+        url = "https://proxylist.geonode.com/api/proxy-list?protocols=socks5&limit=500&sort_by=lastChecked&sort_type=desc"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                response = await resp.json()
+                return [
+                    f"socks5://{obj["ip"]}:{obj["port"]}"
+                    for obj in response["data"]
+                ]
+
 
 class ImRavzanProxyList(AnyProxy):
     """
     https://raw.githubusercontent.com/im-razvan/proxy_list/main/http.txt
     """
 
-    async def list_proxy(self):
+    async def list_http_proxy(self):
         url = "https://raw.githubusercontent.com/im-razvan/proxy_list/main/http.txt"
         async with AiohttpSession().generate(close_connector=True) as session:
             async with session.get(url) as resp:
                 proxies = await resp.text()
                 return [f"http://{p.strip()}" for p in proxies.splitlines()]
+
+    async def list_socks4_proxy(self) -> list:
+        return []
+
+    async def list_socks5_proxy(self) -> list[str]:
+        url = "https://raw.githubusercontent.com/im-razvan/proxy_list/main/socks5.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [f"socks5://{p.strip()}" for p in proxies.splitlines()]
 
 
 class LionKingsProxy(AnyProxy):
@@ -704,8 +772,25 @@ class LionKingsProxy(AnyProxy):
     https://raw.githubusercontent.com/saisuiu/Lionkings-Http-Proxys-Proxies/main/free.txt
     """
 
-    async def list_proxy(self):
+    async def list_http_proxy(self):
         url = "https://raw.githubusercontent.com/saisuiu/Lionkings-Http-Proxys-Proxies/main/free.txt"
+        async with AiohttpSession().generate(close_connector=True) as session:
+            async with session.get(url) as resp:
+                proxies = await resp.text()
+                return [
+                    f"http://{p.strip()}"
+                    for p in proxies.splitlines()
+                    if is_host_port(p.strip())
+                ]
+
+
+class TheSpeedX:
+    """
+    https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt
+    """
+
+    async def list_http_proxy(self):
+        url = "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt"
         async with AiohttpSession().generate(close_connector=True) as session:
             async with session.get(url) as resp:
                 proxies = await resp.text()
@@ -725,26 +810,29 @@ async def get_ip(session: aiohttp.ClientSession, proxy=None, hd: dict = None):
     url = "https://api.ipify.org"
     url = "https://ipinfo.io/ip"
     # url = "https://programarecetatenie.eu/programare_online"
-    # headers = {
-    #     "Accept": "*/*",
-    #     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,my;q=0.6",
-    #     "Cache-Control": "max-age=0",
-    #     "Connection": "keep-alive",
-    #     "Referer": "https://programarecetatenie.eu/programare_online",
-    #     "Sec-Fetch-Dest": "document",
-    #     "Sec-Fetch-Mode": "navigate",
-    #     "Sec-Fetch-Site": "same-origin",
-    #     "Sec-Fetch-User": "?1",
-    #     "Upgrade-Insecure-Requests": "1",
-    # }
-    # for k, v in ua_generator.generate().headers.get().items():
-    #     headers[k] = v
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,my;q=0.6",
+        "Connection": "keep-alive",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    headers = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,my;q=0.6",
+        "Connection": "keep-alive",
+    }
+    for k, v in ua_generator.generate().headers.get().items():
+        headers[k] = v
 
     if hd:
         headers = hd
     session._default_headers = headers
     try:
-        async with session.get(url, proxy=proxy) as resp:
+        async with session.get(url) as resp:
             return await resp.text()
     except AIOHTTP_NET_ERRORS:
         pass
@@ -755,35 +843,52 @@ async def get_ip(session: aiohttp.ClientSession, proxy=None, hd: dict = None):
 
 
 async def main():
-    proxies = (
-        await GeoNode().list_proxy()
-        + await FreeProxies().list_proxy()
-        + await FreeProxiesList().list_proxy()
-        + await ImRavzanProxyList().list_proxy()
-        + await LionKingsProxy().list_proxy()
-        # + await ProxyMaster().list_proxy()
+    proxies_classes = (
+        GeoNode(),
+        FreeProxies(),
+        FreeProxiesList(),
+        ImRavzanProxyList(),
+        LionKingsProxy(),
+        # ProxyMaster(),
+        TheSpeedX(),
     )
+
+    proxies = [
+        proxy
+        for cls in proxies_classes
+        for proxy in await cls.list_http_proxy()
+    ]
+
     url = "https://programarecetatenie.eu/programare_online"
     headers = {
-        "Accept": "*/*",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,my;q=0.6",
+        "Connection": "keep-alive",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
     }
     for k, v in ua_generator.generate().headers.get().items():
         headers[k] = v
 
     print(f"Raw proxies: {len(proxies)}")
 
-    pool = await filter_proxies(proxies, debug=False)
+    pool = await AutomaticProxyPool(
+        proxies=proxies,
+        second_check=True,    )
     works_proxy = 0
     proxies = []
     with open("auto-proxy.txt", "w") as f:
         f.write(f"SESSION WITH URL: {url}\n")
     while True:
         if len(pool.proxies) < 10:
-            await asyncio.sleep(5)
+            await asyncio.sleep(1)
             continue
         await asyncio.sleep(1.5)
 
-        print(f"We have total {len(pool.proxies)} total")
+        print(f"We have total {len(pool.proxies)} proxies")
         start = datetime.datetime.now()
         session = await pool.get_session()
         async with session:
@@ -791,7 +896,7 @@ async def main():
             res = await asyncio.gather(
                 *[get_ip(session, None, headers) for _ in range(60)]
             )
-            pprint(res)
+            # pprint(res)
             print(
                 f"{len(res)} requests "
                 f"({len([r for r in res if not r])} failed) in "
@@ -831,5 +936,5 @@ async def main():
         )
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     asyncio.run(main())

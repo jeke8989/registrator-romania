@@ -1,8 +1,9 @@
 import asyncio
 import calendar
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from operator import le
 from pprint import pprint
+import random
 import re
 import time
 from typing import Required, TypedDict
@@ -32,6 +33,7 @@ from registrator_romania.proxy import (
     LionKingsProxy,
     ProxyMaster,
     AutomaticProxyPool,
+    TheSpeedX,
 )
 
 
@@ -57,18 +59,19 @@ async def get_proxy_pool(start: bool = True, debug: bool = False):
         FreeProxiesList(),
         ImRavzanProxyList(),
         LionKingsProxy(),
+        TheSpeedX(),
         ProxyMaster(),
     )
     proxies = [
         proxy
         for proxy_class in proxies_classes
-        for proxy in await proxy_class.list_proxy()
+        for proxy in await proxy_class.list_http_proxy()
     ]
 
     if debug:
         logger.debug(f"Total raw proxies - {len(proxies)}")
 
-    pool = AutomaticProxyPool(proxies=proxies, debug=debug)
+    pool = AutomaticProxyPool(proxies=proxies, debug=debug, second_check=True)
     if start:
         await pool
     return pool
@@ -106,14 +109,16 @@ class APIRomania:
 
         return self._proxy_pool
 
-    async def get_recaptcha_token(self):
+    async def get_recaptcha_token(
+        self, proxy: str = None, use_proxy: bool = False
+    ):
         """Async get and return data for `g-recaptcha-response` field."""
-        base_url = "https://www.google.com/recaptcha"
+        base_url = self.CAPTCHA_BASE_URL
         post_data = "v={}&reason=q&c={}&k={}&co={}&hl=en&size=invisible&chr=%5B89%2C64%2C27%5D&vh=13599012192&bg=!q62grYxHRvVxjUIjSFNd0mlvrZ-iCgIHAAAB6FcAAAANnAkBySdqTJGFRK7SirleWAwPVhv9-XwP8ugGSTJJgQ46-0IMBKN8HUnfPqm4sCefwxOOEURND35prc9DJYG0pbmg_jD18qC0c-lQzuPsOtUhHTtfv3--SVCcRvJWZ0V3cia65HGfUys0e1K-IZoArlxM9qZfUMXJKAFuWqZiBn-Qi8VnDqI2rRnAQcIB8Wra6xWzmFbRR2NZqF7lDPKZ0_SZBEc99_49j07ISW4X65sMHL139EARIOipdsj5js5JyM19a2TCZJtAu4XL1h0ZLfomM8KDHkcl_b0L-jW9cvAe2K2uQXKRPzruAvtjdhMdODzVWU5VawKhpmi2NCKAiCRUlJW5lToYkR_X-07AqFLY6qi4ZbJ_sSrD7fCNNYFKmLfAaxPwPmp5Dgei7KKvEQmeUEZwTQAS1p2gaBmt6SCOgId3QBfF_robIkJMcXFzj7R0G-s8rwGUSc8EQzT_DCe9SZsJyobu3Ps0-YK-W3MPWk6a69o618zPSIIQtSCor9w_oUYTLiptaBAEY03NWINhc1mmiYu2Yz5apkW_KbAp3HD3G0bhzcCIYZOGZxyJ44HdGsCJ-7ZFTcEAUST-aLbS-YN1AyuC7ClFO86CMICVDg6aIDyCJyIcaJXiN-bN5xQD_NixaXatJy9Mx1XEnU4Q7E_KISDJfKUhDktK5LMqBJa-x1EIOcY99E-eyry7crf3-Hax3Uj-e-euzRwLxn2VB1Uki8nqJQVYUgcjlVXQhj1X7tx4jzUb0yB1TPU9uMBtZLRvMCRKvFdnn77HgYs5bwOo2mRECiFButgigKXaaJup6NM4KRUevhaDtnD6aJ8ZWQZTXz_OJ74a_OvPK9eD1_5pTG2tUyYNSyz-alhvHdMt5_MAdI3op4ZmcvBQBV9VC2JLjphDuTW8eW_nuK9hN17zin6vjEL8YIm_MekB_dIUK3T1Nbyqmyzigy-Lg8tRL6jSinzdwOTc9hS5SCsPjMeiblc65aJC8AKmA5i80f-6Eg4BT305UeXKI3QwhI3ZJyyQAJTata41FoOXl3EF9Pyy8diYFK2G-CS8lxEpV7jcRYduz4tEPeCpBxU4O_KtM2iv4STkwO4Z_-c-fMLlYu9H7jiFnk6Yh8XlPE__3q0FHIBFf15zVSZ3qroshYiHBMxM5BVQBOExbjoEdYKx4-m9c23K3suA2sCkxHytptG-6yhHJR3EyWwSRTY7OpX_yvhbFri0vgchw7U6ujyoXeCXS9N4oOoGYpS5OyFyRPLxJH7yjXOG2Play5HJ91LL6J6qg1iY8MIq9XQtiVZHadVpZVlz3iKcX4vXcQ3rv_qQwhntObGXPAGJWEel5OiJ1App7mWy961q3mPg9aDEp9VLKU5yDDw1xf6tOFMwg2Q-PNDaKXAyP_FOkxOjnu8dPhuKGut6cJr449BKDwbnA9BOomcVSztEzHGU6HPXXyNdZbfA6D12f5lWxX2B_pobw3a1gFLnO6mWaNRuK1zfzZcfGTYMATf6d7sj9RcKNS230XPHWGaMlLmNxsgXkEN7a9PwsSVwcKdHg_HU4vYdRX6vkEauOIwVPs4dS7yZXmtvbDaX1zOU4ZYWg0T42sT3nIIl9M2EeFS5Rqms_YzNp8J-YtRz1h5RhtTTNcA5jX4N-xDEVx-vD36bZVzfoMSL2k85PKv7pQGLH-0a3DsR0pePCTBWNORK0g_RZCU_H898-nT1syGzNKWGoPCstWPRvpL9cnHRPM1ZKemRn0nPVm9Bgo0ksuUijgXc5yyrf5K49UU2J5JgFYpSp7aMGOUb1ibrj2sr-D63d61DtzFJ2mwrLm_KHBiN_ECpVhDsRvHe5iOx_APHtImevOUxghtkj-8RJruPgkTVaML2MEDOdL_UYaldeo-5ckZo3VHss7IpLArGOMTEd0bSH8tA8CL8RLQQeSokOMZ79Haxj8yE0EAVZ-k9-O72mmu5I0wH5IPgapNvExeX6O1l3mC4MqLhKPdOZOnTiEBlSrV4ZDH_9fhLUahe5ocZXvXqrud9QGNeTpZsSPeIYubeOC0sOsuqk10sWB7NP-lhifWeDob-IK1JWcgFTytVc99RkZTjUcdG9t8prPlKAagZIsDr1TiX3dy8sXKZ7d9EXQF5P_rHJ8xvmUtCWqbc3V5jL-qe8ANypwHsuva75Q6dtqoBR8vCE5xWgfwB0GzR3Xi_l7KDTsYAQIrDZVyY1UxdzWBwJCrvDrtrNsnt0S7BhBJ4ATCrW5VFPqXyXRiLxHCIv9zgo-NdBZQ4hEXXxMtbem3KgYUB1Rals1bbi8X8MsmselnHfY5LdOseyXWIR2QcrANSAypQUAhwVpsModw7HMdXgV9Uc-HwCMWafOChhBr88tOowqVHttPtwYorYrzriXNRt9LkigESMy1bEDx79CJguitwjQ9IyIEu8quEQb_-7AEXrfDzl_FKgASnnZLrAfZMtgyyddIhBpgAvgR_c8a8Nuro-RGV0aNuunVg8NjL8binz9kgmZvOS38QaP5anf2vgzJ9wC0ZKDg2Ad77dPjBCiCRtVe_dqm7FDA_cS97DkAwVfFawgce1wfWqsrjZvu4k6x3PAUH1UNzQUxVgOGUbqJsaFs3GZIMiI8O6-tZktz8i8oqpr0RjkfUhw_I2szHF3LM20_bFwhtINwg0rZxRTrg4il-_q7jDnVOTqQ7fdgHgiJHZw_OOB7JWoRW6ZlJmx3La8oV93fl1wMGNrpojSR0b6pc8SThsKCUgoY6zajWWa3CesX1ZLUtE7Pfk9eDey3stIWf2acKolZ9fU-gspeACUCN20EhGT-HvBtNBGr_xWk1zVJBgNG29olXCpF26eXNKNCCovsILNDgH06vulDUG_vR5RrGe5LsXksIoTMYsCUitLz4HEehUOd9mWCmLCl00eGRCkwr9EB557lyr7mBK2KPgJkXhNmmPSbDy6hPaQ057zfAd5s_43UBCMtI-aAs5NN4TXHd6IlLwynwc1zsYOQ6z_HARlcMpCV9ac-8eOKsaepgjOAX4YHfg3NekrxA2ynrvwk9U-gCtpxMJ4f1cVx3jExNlIX5LxE46FYIhQ"
-        session = await self.get_session(with_proxy_if_exists=True)
-        session._default_headers = {
-            "Content-type": "application/x-www-form-urlencoded"
-        }
+
+        session = await self.get_session(with_proxy_if_exists=use_proxy)
+        session._default_headers = self.headers_captcha_url
+
         regex = r"(?P<endpoint>[api2|enterprise]+)\/anchor\?(?P<params>.*)"
         data = re.finditer(regex, self.CAPTCHA_URL)
         assert data
@@ -121,12 +126,10 @@ class APIRomania:
 
         url_get = f"{base_url}/{data["endpoint"]}/anchor?{data["params"]}"
         async with session:
-            url = url_get
             try:
-                async with session.get(url_get) as resp:
+                async with session.get(url_get, proxy=proxy) as resp:
                     response = await resp.text()
 
-                proxy = self._proxy_pool.last_proxy_used
                 results = re.findall(
                     r'"recaptcha-token" value="(.*?)"', response
                 )
@@ -144,8 +147,9 @@ class APIRomania:
                 url_post = (
                     f"{base_url}/{data["endpoint"]}/reload?k={params["k"]}"
                 )
-                url = url_post
-                async with session.post(url_post, data=this_post_data) as resp:
+                async with session.post(
+                    url_post, data=this_post_data, proxy=proxy
+                ) as resp:
                     response = await resp.text()
 
                 results = re.findall(r'"rresp","(.*?)"', response)
@@ -154,7 +158,6 @@ class APIRomania:
 
                 return results[0]
             except AIOHTTP_NET_ERRORS as e:
-                print(f"{url}\n{e.__class__.__name__}: {e}")
                 pass
 
     async def get_captcha_token(self):
@@ -197,6 +200,10 @@ class APIRomania:
         for k, v in ua_generator.generate().headers.get().items():
             headers[k] = v
         return headers
+
+    @property
+    def headers_captcha_url(self) -> dict[str, str]:
+        return {"Content-Type": "application/x-www-form-urlencoded"}
 
     @property
     def headers_registrations_list_url(self) -> dict[str, str]:
@@ -443,35 +450,37 @@ class APIRomania:
             "g-recaptcha-response": g_recaptcha_response,
         }
 
-        # session = self._sessionmaker.generate(self._connections_pool)
         use_proxy = True
-        session = await self.get_session(
-            with_proxy_if_exists=use_proxy, timeout=7
-        )
+        session = await self.get_session(with_proxy_if_exists=use_proxy)
         session._default_headers = self.headers_registration_url
         start = datetime.now()
         async with session:
             raw = None
             try:
-                async with session.post(
-                    self.MAIN_URL, data=data, proxy=proxy
-                ) as resp:
-                    raw = await resp.read()
-                    html = await resp.text()
-                    error_text = None
-                    username = user_data["Nume Pasaport"]
+                async with asyncio.timeout(5):
+                    async with session.post(
+                        self.MAIN_URL, data=data, proxy=proxy
+                    ) as resp:
+                        raw = await resp.read()
+                        html = await resp.text()
+                error_text = None
+                username = user_data["Nume Pasaport"]
 
-                    if self.is_success_registration(html):
-                        logger.info(f"{username} registered successfully")
-                        if queue:
-                            await queue.put((user_data, html))
-                    else:
-                        error_text = self.get_error_registration_as_text(html)
-                        logger.info(
-                            f"{username} got an error from server: {error_text}"
-                        )
+                if self.is_success_registration(html):
+                    logger.info(
+                        f"{username} registered successfully by proxy {proxy}"
+                    )
+                    if queue:
+                        await queue.put((user_data, html))
+                else:
+                    error_text = self.get_error_registration_as_text(html)
+                    logger.info(
+                        f"{username} got an error from server: {error_text}"
+                    )
 
-                    return html
+                return html
+            except asyncio.TimeoutError as e:
+                raise e
             except AIOHTTP_NET_ERRORS as e:
                 raw_msg = (
                     "Not found" if not raw else raw.decode(errors="replace")
@@ -557,7 +566,9 @@ class APIRomania:
             "search[regex]": "false",
         }
 
-        session = self._sessionmaker.generate(self._connections_pool)
+        session = self._sessionmaker.generate(
+            self._connections_pool, close_connector=True
+        )
         session._default_headers = self.headers_registrations_list_url
         async with session:
             try:
@@ -570,37 +581,122 @@ class APIRomania:
                 pass
 
 
+async def get_unregister_users(
+    users_data_list: list[UserData],
+    registration_dates: list[datetime] = None,
+    tip_formular: int = "",
+    **filter_kwargs,
+):
+    api = APIRomania()
+    response = await api.see_registrations(
+        tip_formular=tip_formular,
+        data_programarii=registration_dates,
+        **filter_kwargs,
+    )
+    registered_users = response["data"]
+    registered_usernames = [
+        (obj["nume_pasaport"].lower(), obj["prenume_pasaport"].lower())
+        for obj in registered_users
+    ]
+
+    unregistered_users = []
+    for user in users_data_list:
+        names = (
+            user["Nume Pasaport"].lower(),
+            user["Prenume Pasaport"].lower(),
+        )
+        if names not in registered_usernames:
+            unregistered_users.append(user)
+
+    return unregistered_users
+
+
 async def registration(tip_formular: int, registration_date: datetime):
     api = APIRomania()
-    users_data = get_users_data_from_docx()
-    users_data = generate_fake_users_data(30)
-    # assert all(
-    #     k in [key for obj in users_data for key in list(obj.keys())]
-    #     for obj in users_data_
-    #     for k in list(obj.keys())
-    # )
+    users_data = get_users_data_from_docx() + get_users_data_from_xslx()
+    filtered_us_data = await get_unregister_users(
+        users_data,
+        registration_dates=[
+            (registration_date - timedelta(days=5)),
+            registration_date,
+        ],
+        tip_formular=tip_formular,
+    )
+    print(
+        f"Total users - {len(users_data)}, not registered - {len(filtered_us_data)} yet"
+    )
+    users_data = filtered_us_data
+    return
+    # users_data = generate_fake_users_data(79)
+    assert all(
+        k in [key for obj in users_data for key in list(obj.keys())]
+        for obj in generate_fake_users_data(1)
+        for k in list(obj.keys())
+    )
 
     pool = await api.get_proxy_pool()
     report_tasks = []
     successfully_registered = []
     queue = asyncio.Queue()
 
-    while len(pool.proxies) < 20:
+    while len(pool.proxies) < 5:
+        print(f"Wait for 5 proxies, now we have {len(pool.proxies)} proxies")
         await asyncio.sleep(1)
 
+    proxies = []
+
+    async def update_proxy_list():
+        nonlocal proxies
+        try:
+            while True:
+                unstorted_proxies = await pool.collect_valid_proxies(
+                    api.MAIN_URL, headers=api.headers_main_url
+                )
+                sorted_proxies = pool.sort_proxies_by_timeout(unstorted_proxies)
+
+                proxies = [obj["proxy"] for obj in sorted_proxies]
+                await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            pass
+
+    do_check_places = False
+    task = asyncio.create_task(update_proxy_list())
+    while not proxies:
+        await asyncio.sleep(1)
+
+    start = None
     while True:
-        print(f"We have {len(pool.proxies)} proxy in pool")
-
         dt = moscow_dt_now()
-        # places = await api.get_free_places_for_date(
-        #     tip_formular=tip_formular,
-        #     month=registration_date.month,
-        #     day=registration_date.day,
-        #     year=registration_date.year,
-        # )
+        if len(proxies) < 2:
+            print(
+                f"Wait for 2 proxies for site, "
+                f"now we have {len(proxies)} for site"
+            )
+            await asyncio.sleep(1)
+            continue
 
-        # if not places:
-        #     continue
+        if not start:
+            start = datetime.now()
+
+        print(
+            f"We have {len(pool.proxies)} proxy in pool. "
+            f"And {len(proxies)} for site"
+        )
+
+        if do_check_places:
+            places = await api.get_free_places_for_date(
+                tip_formular=tip_formular,
+                month=registration_date.month,
+                day=registration_date.day,
+                year=registration_date.year,
+            )
+            print(f"Free places - {places}")
+            if not places and successfully_registered:
+                break
+            elif not places:
+                continue
+            else:
+                do_check_places = False
 
         users_for_registrate = [
             u for u in users_data if u not in successfully_registered
@@ -611,29 +707,30 @@ async def registration(tip_formular: int, registration_date: datetime):
                 registration_date=registration_date,
                 tip_formular=tip_formular,
                 queue=queue,
+                proxy=random.choice(proxies),
             )
             for user_data in users_for_registrate
         ]
 
         start = datetime.now()
-        results = await asyncio.gather(*tasks)
-        empty = [r for r in results if not r]
-        not_empty = [r for r in results if r]
-        successfully_registered.extend(not_empty)
-
-        print(
-            f"Sended {len(tasks)} requests ({len(empty)} failed) "
-            f"in {datetime.now() - start}. Successfully registered - {len(successfully_registered)}"
-        )
-        await asyncio.sleep(3)
+        try:
+            results = await asyncio.gather(*tasks)
+        except asyncio.TimeoutError:
+            print("timeout")
+        else:
+            empty = [r for r in results if not r]
+            print(
+                f"Sended {len(tasks)} requests ({len(empty)} failed) "
+                f"in {datetime.now() - start}."
+            )
 
         while not queue.empty():
             user_data, html = queue.get_nowait()
             username = user_data["Nume Pasaport"]
 
             fn = f"async_test/{username}_{time.time()}_success_with-proxy.html"
-            with open(fn, "w") as f:
-                f.write(html)
+            # with open(fn, "w") as f:
+            #     f.write(html)
 
             report_tasks.append(
                 bot.send_msg_into_chat(
@@ -648,6 +745,8 @@ async def registration(tip_formular: int, registration_date: datetime):
         if dt.hour == 9 and dt.minute >= 1:
             break
 
+    print(f"script took {datetime.now() - start}")
+    task.cancel()
     for task in report_tasks:
         continue
         await task
@@ -660,18 +759,19 @@ def moscow_dt_now():
 
 async def main():
     tip_formular = 4
-    tip_formular = 3
+    # tip_formular = 2
     moscow_dt = moscow_dt_now()
     registration_date = datetime(
         # year=moscow_dt.year,
         # month=11,
         # day=datetime.now().day,
         year=moscow_dt.year,
-        month=9,
-        day=11,
+        month=11,
+        day=14,
     )
-
+    start = datetime.now()
     await registration(tip_formular, registration_date)
+    print(datetime.now() - start, "script finish")
     ...
 
 
