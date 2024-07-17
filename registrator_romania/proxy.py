@@ -106,15 +106,13 @@ async def check_proxy(
 ) -> dict:
     url = "https://api.ipify.org"
 
-    if proxy.startswith("socks"):
-        connector = ProxyConnector.from_url(proxy)
-        # proxy = None
-
+    connector = aiohttp.TCPConnector(loop=asyncio.get_running_loop())
     async with AiohttpSession().generate(
         close_connector=close_connector,
         connector=connector,
         total_timeout=timeout or 20,
     ) as session:
+        
         try:
             start = datetime.datetime.now()
             async with session.get(url, proxy=proxy) as resp:
@@ -139,10 +137,10 @@ async def check_proxy(
 class AiohttpSession:
     def generate_connector(self):
         return aiohttp.TCPConnector(
-            ssl=False,
+            # ssl=False,
             limit=0,
             limit_per_host=0,
-            force_close=False,
+            # force_close=False,
         )
 
     def generate(
@@ -157,9 +155,9 @@ class AiohttpSession:
         timeout = aiohttp.ClientTimeout(total_timeout)
         session = aiohttp.ClientSession(
             trust_env=True,
-            connector=connector,
-            json_serialize=orjson.dumps,
-            connector_owner=close_connector,
+            # connector=connector,
+            # json_serialize=orjson.dumps,
+            # connector_owner=close_connector,
             timeout=timeout,
         )
         return session
@@ -408,7 +406,8 @@ class AutomaticProxyPool:
         if not self.proxies:
             raise ValueError("Proxies list empty")
         session = AiohttpSession().generate(
-            connector=self._pool, total_timeout=timeout
+            # connector=self._pool, total_timeout=timeout
+            total_timeout=timeout
         )
         self_class = self
 
@@ -844,13 +843,13 @@ async def get_ip(session: aiohttp.ClientSession, proxy=None, hd: dict = None):
 
 async def main():
     proxies_classes = (
-        GeoNode(),
-        FreeProxies(),
+        # GeoNode(),
+        # FreeProxies(),
         FreeProxiesList(),
         ImRavzanProxyList(),
         LionKingsProxy(),
         # ProxyMaster(),
-        TheSpeedX(),
+        # TheSpeedX(),
     )
 
     proxies = [
@@ -877,7 +876,8 @@ async def main():
 
     pool = await AutomaticProxyPool(
         proxies=proxies,
-        second_check=True,    )
+        second_check=False,
+    )
     works_proxy = 0
     proxies = []
     with open("auto-proxy.txt", "w") as f:
@@ -889,6 +889,7 @@ async def main():
         await asyncio.sleep(1.5)
 
         print(f"We have total {len(pool.proxies)} proxies")
+        
         start = datetime.datetime.now()
         session = await pool.get_session()
         async with session:
@@ -902,6 +903,7 @@ async def main():
                 f"({len([r for r in res if not r])} failed) in "
                 f"{datetime.datetime.now() - start}."
             )
+            continue
             # return
             # stop = datetime.datetime.now()
             # if res:
@@ -936,5 +938,5 @@ async def main():
         )
 
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     asyncio.run(main())

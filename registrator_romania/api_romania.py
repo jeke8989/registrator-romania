@@ -1,7 +1,9 @@
 import asyncio
 import calendar
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, date, timedelta
 from operator import le
+import os
 from pprint import pprint
 import random
 import re
@@ -15,6 +17,7 @@ from loguru import logger
 import aiohttp
 import bs4
 from pyjsparser import parse
+from requests_toolbelt import user_agent
 import ua_generator
 from pypasser import reCaptchaV3
 from registrator_romania import bot
@@ -22,7 +25,10 @@ from registrator_romania.new_request_registrator import (
     generate_fake_users_data,
     get_users_data_from_xslx,
 )
-from registrator_romania.parser import get_users_data_from_docx
+from registrator_romania.parser import (
+    get_users_data_from_csv,
+    get_users_data_from_docx,
+)
 from registrator_romania.proxy import (
     AIOHTTP_NET_ERRORS,
     AiohttpSession,
@@ -52,8 +58,10 @@ UserData = TypedDict(
 )
 
 
-async def get_proxy_pool(start: bool = True, debug: bool = False):
-    proxies_classes = (
+async def get_proxy_pool(
+    start: bool = True, debug: bool = False, offset: int = 0
+):
+    proxies_classes = [
         GeoNode(),
         FreeProxies(),
         FreeProxiesList(),
@@ -61,7 +69,7 @@ async def get_proxy_pool(start: bool = True, debug: bool = False):
         LionKingsProxy(),
         TheSpeedX(),
         ProxyMaster(),
-    )
+    ]
     proxies = [
         proxy
         for proxy_class in proxies_classes
@@ -71,7 +79,12 @@ async def get_proxy_pool(start: bool = True, debug: bool = False):
     if debug:
         logger.debug(f"Total raw proxies - {len(proxies)}")
 
-    pool = AutomaticProxyPool(proxies=proxies, debug=debug, second_check=True)
+    pool = AutomaticProxyPool(
+        proxies=proxies[offset:],
+        debug=debug,
+        # second_check=True,
+        sources_classes=proxies_classes,
+    )
     if start:
         await pool
     return pool
@@ -101,10 +114,10 @@ class APIRomania:
         self._lock = asyncio.Lock()
         self._semaphore = asyncio.Semaphore(semaphore_value)
 
-    async def get_proxy_pool(self):
+    async def get_proxy_pool(self, offset: int = 0):
         if not self._proxy_pool:
             self._proxy_pool = await get_proxy_pool(
-                start=True, debug=self._debug
+                start=True, debug=self._debug, offset=offset
             )
 
         return self._proxy_pool
@@ -453,17 +466,14 @@ class APIRomania:
         use_proxy = True
         session = await self.get_session(with_proxy_if_exists=use_proxy)
         session._default_headers = self.headers_registration_url
-        start = datetime.now()
         async with session:
-            raw = None
             try:
                 async with asyncio.timeout(5):
                     async with session.post(
                         self.MAIN_URL, data=data, proxy=proxy
                     ) as resp:
-                        raw = await resp.read()
                         html = await resp.text()
-                error_text = None
+
                 username = user_data["Nume Pasaport"]
 
                 if self.is_success_registration(html):
@@ -472,26 +482,15 @@ class APIRomania:
                     )
                     if queue:
                         await queue.put((user_data, html))
-                else:
-                    error_text = self.get_error_registration_as_text(html)
-                    logger.info(
-                        f"{username} got an error from server: {error_text}"
-                    )
 
                 return html
             except asyncio.TimeoutError as e:
                 raise e
             except AIOHTTP_NET_ERRORS as e:
-                raw_msg = (
-                    "Not found" if not raw else raw.decode(errors="replace")
-                )
-                logger.warning(
-                    f"{self.MAIN_URL}\n"
-                    f"{e.__class__.__name__}: {e}. Raw response: {raw_msg}.\n "
-                    f"{datetime.now() - start}\nLast proxy - "
-                    f"{self._proxy_pool.last_proxy_used}\n\n"
-                )
-                pass
+                logger.warning(f"{e.__class__.__name__}: {e}")
+                return str(e)
+            except Exception as e:
+                logger.exception(e)
 
     async def see_registrations(
         self,
@@ -611,39 +610,21 @@ async def get_unregister_users(
     return unregistered_users
 
 
-async def registration(tip_formular: int, registration_date: datetime):
+async def registration(
+    tip_formular: int,
+    registration_date: datetime,
+    users_data: list[dict[str, str]],
+    offset: int = 0,
+):
     api = APIRomania()
-    users_data = get_users_data_from_docx() + get_users_data_from_xslx()
-    filtered_us_data = await get_unregister_users(
-        users_data,
-        registration_dates=[
-            (registration_date - timedelta(days=5)),
-            registration_date,
-        ],
-        tip_formular=tip_formular,
-    )
-    print(
-        f"Total users - {len(users_data)}, not registered - {len(filtered_us_data)} yet"
-    )
-    users_data = filtered_us_data
-    return
-    # users_data = generate_fake_users_data(79)
-    assert all(
-        k in [key for obj in users_data for key in list(obj.keys())]
-        for obj in generate_fake_users_data(1)
-        for k in list(obj.keys())
-    )
-
-    pool = await api.get_proxy_pool()
+    pool = await api.get_proxy_pool(offset=offset)
     report_tasks = []
     successfully_registered = []
     queue = asyncio.Queue()
 
-    while len(pool.proxies) < 5:
-        print(f"Wait for 5 proxies, now we have {len(pool.proxies)} proxies")
+    while len(pool.proxies) < 2:
+        # print(f"Wait for 5 proxies, now we have {len(pool.proxies)} proxies")
         await asyncio.sleep(1)
-
-    proxies = []
 
     async def update_proxy_list():
         nonlocal proxies
@@ -655,100 +636,133 @@ async def registration(tip_formular: int, registration_date: datetime):
                 sorted_proxies = pool.sort_proxies_by_timeout(unstorted_proxies)
 
                 proxies = [obj["proxy"] for obj in sorted_proxies]
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(2)
         except asyncio.CancelledError:
             pass
 
     do_check_places = False
+
+    async def make_registration():
+        nonlocal proxies, do_check_places, successfully_registered, report_tasks
+
+        while True:
+            await asyncio.sleep(1)
+            dt = moscow_dt_now()
+            # print(
+            #     f"We have {len(pool.proxies)} proxy in pool. "
+            #     f"And {len(proxies)} for site"
+            # )
+
+            if do_check_places:
+                places = await api.get_free_places_for_date(
+                    tip_formular=tip_formular,
+                    month=registration_date.month,
+                    day=registration_date.day,
+                    year=registration_date.year,
+                )
+                # print(f"Free places - {places}")
+                if not places and successfully_registered:
+                    break
+                elif not places:
+                    continue
+                else:
+                    do_check_places = False
+
+            users_for_registrate = [
+                u for u in users_data if u not in successfully_registered
+            ]
+
+            first_user = random.choice(users_for_registrate)
+            proxy = random.choice(proxies)
+            try:
+                html = await api.make_registration(
+                    first_user,
+                    registration_date=registration_date,
+                    tip_formular=tip_formular,
+                    proxy=proxy,
+                )
+            except asyncio.TimeoutError:
+                continue
+
+            if html is None:
+                continue
+            if api.is_success_registration(html):
+                successfully_registered.append(first_user)
+                users_for_registrate.remove(first_user)
+            else:
+                error = api.get_error_registration_as_text(html)
+                print(error)
+                if error.count("Data înregistrării este dezactivata"):
+                    continue
+                if error == "NU mai este loc":
+                    return
+
+            tasks = [
+                api.make_registration(
+                    user_data,
+                    registration_date=registration_date,
+                    tip_formular=tip_formular,
+                    queue=queue,
+                    proxy=random.choice(proxies),
+                )
+                for user_data in users_for_registrate
+                if user_data not in successfully_registered
+            ]
+
+            start = datetime.now()
+            try:
+                results = await asyncio.gather(*tasks)
+            except asyncio.TimeoutError:
+                pass
+                print("timeout")
+            else:
+                empty = [r for r in results if not r]
+                print(
+                    f"Sended {len(tasks)} requests ({len(empty)} failed) "
+                    f"in {datetime.now() - start}."
+                )
+
+            while not queue.empty():
+                user_data, html = await queue.get()
+                username = user_data["Nume Pasaport"]
+
+                report_tasks.append(
+                    bot.send_msg_into_chat(
+                        f"Успешная попытка регистрарции для {username}", html
+                    )
+                )
+                successfully_registered.append(user_data)
+
+            if len(successfully_registered) >= len(users_data):
+                break
+
+            if dt.hour == 9 and dt.minute >= 1:
+                break
+
+    do_check_places = False
     task = asyncio.create_task(update_proxy_list())
+
+    proxies = []
+
+    for_site_proxy = 12
+    while len(proxies) < for_site_proxy:
+        print(
+            f"Wait for {for_site_proxy} proxies for site, "
+            f"now we have {len(proxies)} for site"
+        )
+        await asyncio.sleep(1)
+        continue
+
     while not proxies:
         await asyncio.sleep(1)
 
-    start = None
-    while True:
-        dt = moscow_dt_now()
-        if len(proxies) < 2:
-            print(
-                f"Wait for 2 proxies for site, "
-                f"now we have {len(proxies)} for site"
-            )
-            await asyncio.sleep(1)
-            continue
+    await asyncio.gather(
+        *[make_registration() for _ in range(20)], return_exceptions=True
+    )
+    # await make_registration()
 
-        if not start:
-            start = datetime.now()
-
-        print(
-            f"We have {len(pool.proxies)} proxy in pool. "
-            f"And {len(proxies)} for site"
-        )
-
-        if do_check_places:
-            places = await api.get_free_places_for_date(
-                tip_formular=tip_formular,
-                month=registration_date.month,
-                day=registration_date.day,
-                year=registration_date.year,
-            )
-            print(f"Free places - {places}")
-            if not places and successfully_registered:
-                break
-            elif not places:
-                continue
-            else:
-                do_check_places = False
-
-        users_for_registrate = [
-            u for u in users_data if u not in successfully_registered
-        ]
-        tasks = [
-            api.make_registration(
-                user_data,
-                registration_date=registration_date,
-                tip_formular=tip_formular,
-                queue=queue,
-                proxy=random.choice(proxies),
-            )
-            for user_data in users_for_registrate
-        ]
-
-        start = datetime.now()
-        try:
-            results = await asyncio.gather(*tasks)
-        except asyncio.TimeoutError:
-            print("timeout")
-        else:
-            empty = [r for r in results if not r]
-            print(
-                f"Sended {len(tasks)} requests ({len(empty)} failed) "
-                f"in {datetime.now() - start}."
-            )
-
-        while not queue.empty():
-            user_data, html = queue.get_nowait()
-            username = user_data["Nume Pasaport"]
-
-            fn = f"async_test/{username}_{time.time()}_success_with-proxy.html"
-            # with open(fn, "w") as f:
-            #     f.write(html)
-
-            report_tasks.append(
-                bot.send_msg_into_chat(
-                    f"Успешная попытка регистрарции для {username}", fn
-                )
-            )
-            successfully_registered.append(user_data)
-
-        if len(successfully_registered) >= len(users_data):
-            break
-
-        if dt.hour == 9 and dt.minute >= 1:
-            break
-
-    print(f"script took {datetime.now() - start}")
     task.cancel()
     for task in report_tasks:
-        continue
         await task
         await asyncio.sleep(3)
 
@@ -757,23 +771,72 @@ def moscow_dt_now():
     return datetime.now().astimezone(tz=ZoneInfo("Europe/Moscow"))
 
 
+def start_loop(tip_formular, registration_date, users_data):
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(
+        registration(
+            tip_formular=tip_formular,
+            registration_date=registration_date,
+            users_data=users_data,
+            offset=random.randrange(0, 3000, 100),
+        )
+    )
+
+
+def start_registration_with_proccess(
+    users_data: list[dict[str, str]],
+    tip_formular: int,
+    reg_date: datetime,
+    n: int = 5,
+):
+    args = (
+        [tip_formular for _ in range(n)],
+        [reg_date for _ in range(n)],
+        [users_data for _ in range(n)],
+    )
+    with ProcessPoolExecutor(max_workers=n) as e:
+        start = time.time()
+        e.map(start_loop, *args)
+    print("finished: ", time.time() - start)
+
+
 async def main():
     tip_formular = 4
-    # tip_formular = 2
+    # tip_formular = 3
     moscow_dt = moscow_dt_now()
     registration_date = datetime(
-        # year=moscow_dt.year,
-        # month=11,
-        # day=datetime.now().day,
         year=moscow_dt.year,
         month=11,
-        day=14,
+        day=datetime.now().day,
+        # year=moscow_dt.year,
+        # month=10,
+        # day=21,
     )
-    start = datetime.now()
-    await registration(tip_formular, registration_date)
-    print(datetime.now() - start, "script finish")
-    ...
+
+    users_data = get_users_data_from_csv()
+    filtered_us_data = await get_unregister_users(
+        users_data,
+        registration_dates=[
+            registration_date,
+            registration_date,
+        ],
+        tip_formular=tip_formular,
+    )
+    print(
+        f"Total users - {len(users_data)}, {len(filtered_us_data)} not registered yet"
+    )
+    users_data = filtered_us_data
+
+    # users_data = generate_fake_users_data(57)
+
+    # await registration(tip_formular, registration_date, users_data)
+    start_registration_with_proccess(
+        users_data, tip_formular, registration_date
+    )
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # import uvloop
+    # asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(main())

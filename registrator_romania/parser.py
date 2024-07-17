@@ -2,6 +2,7 @@ from datetime import datetime
 from pprint import pprint
 import re
 from docx import Document
+import pandas as pd
 
 from registrator_romania.new_request_registrator import prepare_users_data
 
@@ -91,3 +92,9 @@ def get_users_data_from_docx():
             user.clear()
 
     return prepare_users_data(users)
+
+
+def get_users_data_from_csv():
+    df = pd.read_csv("users.csv")
+    users_data = df.to_dict("records")
+    return prepare_users_data(users_data)
