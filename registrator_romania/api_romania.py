@@ -27,6 +27,7 @@ from registrator_romania.new_request_registrator import (
     get_users_data_from_xslx,
 )
 from registrator_romania.parser import (
+    get_fors_major_user_data,
     get_users_data_from_csv,
     get_users_data_from_docx,
 )
@@ -448,6 +449,7 @@ class APIRomania:
         g_recaptcha_response = await self.get_recaptcha_token()
         if not g_recaptcha_response:
             return
+        registration_date = user_data["reg_date"]
         data = {
             "tip_formular": tip_formular,
             "nume_pasaport": user_data["Nume Pasaport"].strip(),
@@ -803,7 +805,7 @@ def start_registration_with_proccess(
 
 async def main():
     tip_formular = 4
-    # tip_formular = 3
+    # tip_formul    ar = 3
     moscow_dt = moscow_dt_now()
     registration_date = datetime(
         year=moscow_dt.year,
@@ -814,7 +816,7 @@ async def main():
         # day=14,
     )
 
-    users_data = get_users_data_from_csv()
+    users_data = get_fors_major_user_data()
     filtered_us_data = await get_unregister_users(
         users_data,
         registration_dates=[
@@ -840,7 +842,7 @@ async def start_scheduler():
     sch = AsyncIOScheduler()
 
     start_date = moscow_dt_now()
-    start_date = start_date.replace(hour=7)
+    start_date = start_date.replace(hour=8)
     start_date = start_date.replace(minute=20)
 
     sch.add_job(main, "cron", start_date=start_date, max_instances=1)

@@ -1,6 +1,8 @@
 from datetime import datetime
 from pprint import pprint
 import re
+import dateutil
+import dateutil.parser
 from docx import Document
 import pandas as pd
 
@@ -78,9 +80,11 @@ def get_users_data_from_docx():
 
         if key == "Data nasterii":
             try:
-                dt = datetime.strptime(val, "%Y-%m-%d")
+                dt = dateutil.parser.parse(val, dayfirst=True)
+                # dt = datetime.strptime(val, "%Y-%m-%d")
             except Exception:
-                dt = datetime.strptime(val, "%d-%m-%Y")
+                dt = dateutil.parser.parse(val, dayfirst=False)
+                # dt = datetime.strptime(val, "%d-%m-%Y")
             val = dt.strftime("%Y-%m-%d")
         elif key == "":
             val = val.lower()
@@ -98,3 +102,78 @@ def get_users_data_from_csv():
     df = pd.read_csv("users.csv")
     users_data = df.to_dict("records")
     return prepare_users_data(users_data)
+
+
+def get_fors_major_user_data():
+    doc = Document("users-forsmajor.docx")
+    user = False
+    template = {
+        "Nume Pasaport": "",
+        "Prenume Pasaport": "",
+        "Data nasterii": "",
+        "Locul naşterii": "",
+        "Prenume Mama": "",
+        "Prenume Tata": "",
+        "Adresa de email": "",
+        "Serie și număr Pașaport": "",
+    }
+    users = []
+    user = {}
+    mapping = {
+        "Prenume Pasaport": ["Prenume"],
+        "Nume Pasaport": ["Nume"],
+        "Data nasterii": ["Data naşterii"],
+        "Locul naşterii": ["Locul naşterii"],
+        "Prenume Mama": ["Prenumele mamei", "Numele mame", "Numele mamei"],
+        "Prenume Tata": [
+            "Prenumele tatalui",
+            "Numele tatalui",
+        ],
+        "Adresa de email": ["Adresa de e-mail"],
+        "Serie și număr Pașaport": ["Seria şi numar Paşaport"],
+    }
+    reg_date = None
+    for paragraph in doc.paragraphs:
+        text = paragraph.text.replace("\n", "").strip()
+        if len(re.split(r"\w {4}", text)) > 1:
+            reg_date = dateutil.parser.parse(text.split(" ")[-1], dayfirst=True)
+            text = re.split(r"\w {4}", text)[0]
+
+        if not text:
+            continue
+
+        record = re.findall(r"(^[\d\.]*)(.*)", text)[0][1]
+        col, val = list(map(lambda v: v.strip(), record.split(":")))
+
+        key = None
+        for k, v in mapping.items():
+            if col in v:
+                key = k
+                break
+
+        assert key
+        val = Transliterator("tr").transliterate(val)
+
+        if key == "Data nasterii":
+            try:
+                dt = dateutil.parser.parse(val, dayfirst=True)
+                # dt = datetime.strptime(val, "%Y-%m-%d")
+            except Exception:
+                dt = dateutil.parser.parse(val, dayfirst=False)
+                # dt = datetime.strptime(val, "%d-%m-%Y")
+            val = dt.strftime("%Y-%m-%d")
+        elif key == "":
+            val = val.lower()
+
+        user[key] = val
+
+        if key == "Serie și număr Pașaport":
+            user["reg_date"] = reg_date
+            users.append(user.copy())
+            user.clear()
+
+    # prepared = prepare_users_data(users)
+    return users
+
+
+pprint(get_fors_major_user_data())
