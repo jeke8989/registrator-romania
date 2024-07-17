@@ -177,7 +177,7 @@ def run_th(proxies: list[str], q: multiprocessing.Queue):
 class AutomaticProxyPool:
     def __init__(
         self,
-        proxies: list[str],
+        proxies: list[str], 
         debug: bool = False,
         second_check: bool = False,
         sources_classes: list[Type] = None,
@@ -301,7 +301,9 @@ class AutomaticProxyPool:
                 while True:
                     tasks = []
                     async for proxy, time in self:
-                        tasks.append(asyncio.create_task(send_request(proxy)))
+                        task = asyncio.create_task(send_request(proxy))
+                        tasks.append(task)
+                        await asyncio.sleep(0.250)
 
                     await asyncio.gather(*tasks)
                     self.start_background()
@@ -312,15 +314,16 @@ class AutomaticProxyPool:
         self._append_pool_task = asyncio.get_event_loop().create_task(
             background()
         )
+        await asyncio.sleep(0.250)
         return self
 
     async def __anext__(self):
-        while True:
+        while True:                 
             if self._event.is_set():
                 raise StopAsyncIteration
 
             try:
-                result = await asyncio.to_thread(self._queue.get, timeout=5)
+                result = await asyncio.to_thread(self._queue.get_nowait)
             except queue.Empty:
                 if self._event.is_set():
                     raise StopAsyncIteration
@@ -554,7 +557,7 @@ class AutomaticProxyPool:
                     await resp.text()
                     if resp.status == 200:
                         return True, proxy, datetime.datetime.now() - start
-            except Exception:
+            except Exception as e:
                 return False, proxy
 
         async with session:

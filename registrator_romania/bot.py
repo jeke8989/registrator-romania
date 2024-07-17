@@ -18,13 +18,13 @@ async def send_msg_into_chat(message: str, html: str = None) -> None:
     if html:
         async with aiofiles.tempfile.NamedTemporaryFile("w") as f:
             await f.write(html)
-            document = FSInputFile(f.name)
+            document = FSInputFile(f.name, filename=f"{f.name}.html")
             
             await bot.send_document(
                 chat_id,
-                document,
+                document,   
                 caption=message,
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
         
     else:
