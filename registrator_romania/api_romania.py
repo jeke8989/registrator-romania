@@ -16,6 +16,7 @@ from loguru import logger
 
 import aiohttp
 import bs4
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pyjsparser import parse
 from requests_toolbelt import user_agent
 import ua_generator
@@ -463,7 +464,7 @@ class APIRomania:
             "g-recaptcha-response": g_recaptcha_response,
         }
 
-        use_proxy = True
+        use_proxy = bool(proxy)
         session = await self.get_session(with_proxy_if_exists=use_proxy)
         session._default_headers = self.headers_registration_url
         async with session:
@@ -622,8 +623,8 @@ async def registration(
     successfully_registered = []
     queue = asyncio.Queue()
 
-    while len(pool.proxies) < 2:
-        # print(f"Wait for 5 proxies, now we have {len(pool.proxies)} proxies")
+    while not pool.proxies:
+        # print(f"Wait for 2 proxies, now we have {len(pool.proxies)} proxies")
         await asyncio.sleep(1)
 
     async def update_proxy_list():
@@ -673,7 +674,7 @@ async def registration(
             ]
 
             first_user = random.choice(users_for_registrate)
-            proxy = random.choice(proxies)
+            proxy = random.choice(proxies) if proxies else None
             try:
                 html = await api.make_registration(
                     first_user,
@@ -744,14 +745,14 @@ async def registration(
 
     proxies = []
 
-    for_site_proxy = 12
-    while len(proxies) < for_site_proxy:
-        print(
-            f"Wait for {for_site_proxy} proxies for site, "
-            f"now we have {len(proxies)} for site"
-        )
-        await asyncio.sleep(1)
-        continue
+    # for_site_proxy = 5
+    # while len(proxies) < for_site_proxy:
+    #     print(
+    #         f"Wait for {for_site_proxy} proxies for site, "
+    #         f"now we have {len(proxies)} for site"
+    #     )
+    #     await asyncio.sleep(1)
+    #     continue
 
     while not proxies:
         await asyncio.sleep(1)
@@ -802,32 +803,32 @@ def start_registration_with_proccess(
 
 async def main():
     tip_formular = 4
-    # tip_formular = 3
+    tip_formular = 3
     moscow_dt = moscow_dt_now()
     registration_date = datetime(
-        year=moscow_dt.year,
-        month=11,
-        day=datetime.now().day,
         # year=moscow_dt.year,
-        # month=10,
-        # day=21,
+        # month=11,
+        # day=datetime.now().day,
+        year=moscow_dt.year,
+        month=10,
+        day=14,
     )
 
-    users_data = get_users_data_from_csv()
-    filtered_us_data = await get_unregister_users(
-        users_data,
-        registration_dates=[
-            registration_date,
-            registration_date,
-        ],
-        tip_formular=tip_formular,
-    )
-    print(
-        f"Total users - {len(users_data)}, {len(filtered_us_data)} not registered yet"
-    )
-    users_data = filtered_us_data
+    # users_data = get_users_data_from_csv()
+    # filtered_us_data = await get_unregister_users(
+    #     users_data,
+    #     registration_dates=[
+    #         registration_date,
+    #         registration_date,
+    #     ],
+    #     tip_formular=tip_formular,
+    # )
+    # print(
+    #     f"Total users - {len(users_data)}, {len(filtered_us_data)} not registered yet"
+    # )
+    # users_data = filtered_us_data
 
-    # users_data = generate_fake_users_data(57)
+    users_data = generate_fake_users_data(40)
 
     # await registration(tip_formular, registration_date, users_data)
     start_registration_with_proccess(
@@ -835,8 +836,21 @@ async def main():
     )
 
 
+async def start_scheduler():
+    sch = AsyncIOScheduler()
+
+    start_date = moscow_dt_now()
+    start_date = start_date.replace(hour=7)
+    start_date = start_date.replace(minute=20)
+
+    sch.add_job(main, "cron", start_date=start_date, max_instances=1)
+    sch.start()
+    print("started scheduler")
+    while True:
+        await asyncio.sleep(3600)
+    ...
+
+
 if __name__ == "__main__":
-    # import uvloop
-    # asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = asyncio.new_event_loop()
-    loop.run_until_complete(main())
+    loop.run_until_complete(start_scheduler())
