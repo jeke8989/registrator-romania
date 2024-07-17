@@ -803,32 +803,32 @@ def start_registration_with_proccess(
 
 async def main():
     tip_formular = 4
-    tip_formular = 3
+    # tip_formular = 3
     moscow_dt = moscow_dt_now()
     registration_date = datetime(
-        # year=moscow_dt.year,
-        # month=11,
-        # day=datetime.now().day,
         year=moscow_dt.year,
-        month=10,
-        day=14,
+        month=11,
+        day=datetime.now().day,
+        # year=moscow_dt.year,
+        # month=10,
+        # day=14,
     )
 
-    # users_data = get_users_data_from_csv()
-    # filtered_us_data = await get_unregister_users(
-    #     users_data,
-    #     registration_dates=[
-    #         registration_date,
-    #         registration_date,
-    #     ],
-    #     tip_formular=tip_formular,
-    # )
-    # print(
-    #     f"Total users - {len(users_data)}, {len(filtered_us_data)} not registered yet"
-    # )
-    # users_data = filtered_us_data
+    users_data = get_users_data_from_csv()
+    filtered_us_data = await get_unregister_users(
+        users_data,
+        registration_dates=[
+            registration_date,
+            registration_date,
+        ],
+        tip_formular=tip_formular,
+    )
+    print(
+        f"Total users - {len(users_data)}, {len(filtered_us_data)} not registered yet"
+    )
+    users_data = filtered_us_data
 
-    users_data = generate_fake_users_data(40)
+    # users_data = generate_fake_users_data(40)
 
     # await registration(tip_formular, registration_date, users_data)
     start_registration_with_proccess(
