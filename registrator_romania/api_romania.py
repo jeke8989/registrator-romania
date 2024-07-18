@@ -461,8 +461,8 @@ class APIRomania:
 
 async def registration(tip_formular: int, registration_date: datetime):
     api = APIRomania()
-    # users_data = get_users_data_from_xslx()
-    users_data = get_users_data_from_docx()
+    users_data = get_users_data_from_xslx()
+    # users_data = get_users_data_from_docx()
     # pool = await api.get_proxy_pool()
     proxies = []
     successfully_registered = []
