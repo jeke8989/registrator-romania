@@ -851,24 +851,26 @@ async def main():
 
 async def start_scheduler():
     sch = AsyncIOScheduler()
+    hour = 8
+    minute = 20
 
     start_date = moscow_dt_now()
-    start_date = start_date.replace(hour=8)
-    start_date = start_date.replace(minute=20)
-
-    stop_date = moscow_dt_now()
-    stop_date = start_date.replace(hour=9)
-    stop_date = start_date.replace(minute=2)
+    start_date = start_date.replace(hour=hour, minute=minute)
 
     logging.getLogger("apscheduler").setLevel(logging.ERROR)
-    sch.add_job(
-        main, "cron", start_date=start_date, max_instances=1, end_date=stop_date
-    )
+    sch.add_job(main, "cron", start_date=start_date, hour=hour, minute=minute, max_instances=1)
     sch.start()
     print("started scheduler")
+    dt = moscow_dt_now()
     while True:
-        await asyncio.sleep(3600)
-    ...
+        await asyncio.sleep(60)
+        dt = moscow_dt_now()
+        print(f"now - {dt}")
+        
+        if dt.hour == 9 and dt.minute >= 2:
+            break
+    
+    exit(0)
 
 
 if __name__ == "__main__":
