@@ -88,6 +88,9 @@ async def get_proxy_pool(
 
     if debug:
         logger.debug(f"Total raw proxies - {len(proxies)}")
+        
+    if not proxies:
+        raise TypeError(f"Proxies empty - {proxies}")
 
     pool = AutomaticProxyPool(
         proxies=proxies[offset:],
@@ -597,11 +600,16 @@ async def get_unregister_users(
     **filter_kwargs,
 ):
     api = APIRomania()
-    response = await api.see_registrations(
-        tip_formular=tip_formular,
-        data_programarii=registration_dates,
-        **filter_kwargs,
-    )
+    
+    try:
+        response = await api.see_registrations(
+            tip_formular=tip_formular,
+            data_programarii=registration_dates,
+            **filter_kwargs,
+        )
+    except asyncio.TimeoutError:
+        return
+        
     registered_users = response["data"]
     registered_usernames = [
         (obj["nume_pasaport"].lower(), obj["prenume_pasaport"].lower())
@@ -669,12 +677,15 @@ async def registration(
             # )
 
             if do_check_places:
-                places = await api.get_free_places_for_date(
-                    tip_formular=tip_formular,
-                    month=registration_date.month,
-                    day=registration_date.day,
-                    year=registration_date.year,
-                )
+                try:
+                    places = await api.get_free_places_for_date(
+                        tip_formular=tip_formular,
+                        month=registration_date.month,
+                        day=registration_date.day,
+                        year=registration_date.year,
+                    )
+                except asyncio.TimeoutError:
+                    continue
                 # print(f"Free places - {places}")
                 if not places and successfully_registered:
                     break
@@ -727,12 +738,16 @@ async def registration(
 
             start = datetime.now()
             try:
-                results = await asyncio.gather(*tasks)
+                results = await asyncio.gather(*tasks, return_exceptions=True)
             except asyncio.TimeoutError:
                 pass
-                # print("timeout")
+                # print("timeout")      
             else:
-                empty = [r for r in results if not r]
+                empty = [
+                    r
+                    for r in results
+                    if not r or isinstance(r, asyncio.TimeoutError)
+                ]
                 print(
                     f"Sended {len(tasks)} requests ({len(empty)} failed) "
                     f"in {datetime.now() - start}."
@@ -759,7 +774,7 @@ async def registration(
     task = asyncio.create_task(update_proxy_list())
 
     while len(pool.proxies) < 15:
-        print(f"Wait for 10 proxies, now we have {len(pool.proxies)} proxies")
+        print(f"Wait for 15 proxies, now we have {len(pool.proxies)} proxies")
         await asyncio.sleep(1)
 
     proxies = []
@@ -835,14 +850,24 @@ async def main():
     )
 
     users_data = get_users_data_from_xslx()
-    filtered_us_data = await get_unregister_users(
-        users_data,
-        registration_dates=[
-            (registration_date - timedelta(days=7)),
-            registration_date,
-        ],
-        tip_formular=tip_formular,
-    )
+    filtered_us_data = []
+    attempts = 0
+    
+    while not filtered_us_data:
+        filtered_us_data = await get_unregister_users(
+            users_data,
+            registration_dates=[
+                (registration_date - timedelta(days=7)),
+                registration_date,
+            ],
+            tip_formular=tip_formular,
+        )
+        if (attempts % 5) == 0:
+            await asyncio.sleep(15)
+            continue
+        
+        await asyncio.sleep(3)
+        
     print(
         f"Total users - {len(users_data)}, {len(filtered_us_data)} not registered yet"
     )
