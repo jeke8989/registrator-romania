@@ -1,6 +1,7 @@
 import asyncio
 import calendar
 from datetime import datetime, date
+import logging
 from operator import le
 from pprint import pprint
 import time
@@ -10,6 +11,7 @@ import aiofiles
 from loguru import logger
 
 import aiohttp
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import bs4
 from pyjsparser import parse
 import ua_generator
@@ -560,6 +562,36 @@ async def main():
     # pprint(users_data)
     ...
 
+async def start_scheduler():
+    sch = AsyncIOScheduler()
+    hour = 8
+    minute = 20
+
+    start_date = moscow_dt_now()
+    start_date = start_date.replace(hour=hour, minute=minute)
+
+    logging.getLogger("apscheduler").setLevel(logging.ERROR)
+    sch.add_job(
+        main,
+        "cron",
+        start_date=start_date,
+        max_instances=1,
+        timezone=ZoneInfo("Europe/Moscow"),
+    )
+    sch.start()
+    print("started scheduler")
+    dt = moscow_dt_now()
+    while True:
+        dt = moscow_dt_now()
+        print(f"now - {dt}")
+
+        if dt.hour == 9 and dt.minute >= 2:
+            break
+
+        await asyncio.sleep(60)
+
+    exit(0)
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(start_scheduler())
