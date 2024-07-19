@@ -4,7 +4,7 @@ import re
 from docx import Document
 import pandas as pd
 
-from registrator_romania.new_request_registrator import prepare_users_data
+from registrator_romania.new_request_registrator import get_users_data_from_xslx, prepare_users_data
 
 
 class Transliterator:
