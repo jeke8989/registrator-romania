@@ -29,10 +29,10 @@ pytest-asyncio = "^0.23.7"
 openpyxl = "^3.1.5"
 orjson = "^3.10.6"
 python-dateutil = "^2.9.0.post0"
-requests-toolbelt = "^1.0.0"
 slimit = "^0.8.1"
 js2py = "^0.74"
 python-docx = "^1.1.2"
+ffmpeg-downloader = "^0.3.0"
 
 
 [build-system]

@@ -1,3 +1,10 @@
+import warnings
+
+warnings.filterwarnings(
+    "ignore", "invalid escape sequence", category=SyntaxWarning
+)
+
+
 import asyncio
 import calendar
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -22,7 +29,6 @@ import aiohttp
 import bs4
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pyjsparser import parse
-from requests_toolbelt import user_agent
 import ua_generator
 from pypasser import reCaptchaV3
 from registrator_romania import bot
@@ -858,18 +864,25 @@ async def start_scheduler():
     start_date = start_date.replace(hour=hour, minute=minute)
 
     logging.getLogger("apscheduler").setLevel(logging.ERROR)
-    sch.add_job(main, "cron", start_date=start_date, hour=hour, minute=minute, max_instances=1)
+    sch.add_job(
+        main,
+        "cron",
+        start_date=start_date,
+        max_instances=1,
+        timezone=ZoneInfo("Europe/Moscow"),
+    )
     sch.start()
     print("started scheduler")
     dt = moscow_dt_now()
     while True:
-        await asyncio.sleep(60)
         dt = moscow_dt_now()
         print(f"now - {dt}")
-        
+
         if dt.hour == 9 and dt.minute >= 2:
             break
-    
+
+        await asyncio.sleep(60)
+
     exit(0)
 
 
