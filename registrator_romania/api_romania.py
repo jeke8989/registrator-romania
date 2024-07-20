@@ -1,3 +1,5 @@
+import functools
+from gc import callbacks
 import warnings
 
 warnings.filterwarnings(
@@ -88,7 +90,7 @@ async def get_proxy_pool(
 
     if debug:
         logger.debug(f"Total raw proxies - {len(proxies)}")
-        
+
     if not proxies:
         raise TypeError(f"Proxies empty - {proxies}")
 
@@ -305,7 +307,6 @@ class APIRomania:
         if self._main_html:
             return self._main_html
 
-        # session = self._sessionmaker.generate(connector=self._connections_pool)
         session = await self.get_session()
         session._default_headers = self.headers_main_url
 
@@ -374,7 +375,6 @@ class APIRomania:
     async def _get_disabled_days(
         self, year: int, month: int, tip_formular: int
     ):
-        # session = self._sessionmaker.generate(connector=self._connections_pool)
         session = await self.get_session()
         session._default_headers = self.headers_dates_url
 
@@ -429,7 +429,6 @@ class APIRomania:
             year = datetime.now().year
         month = f"0{month}" if len(str(month)) == 1 else str(month)
 
-        # session = self._sessionmaker.generate(self._connections_pool)
         session = await self.get_session()
         session._default_headers = self.headers_places_url
 
@@ -487,16 +486,16 @@ class APIRomania:
                     ) as resp:
                         html = await resp.text()
 
-                username = user_data["Nume Pasaport"]
+                if not isinstance(html, str):
+                    return
 
                 if self.is_success_registration(html):
-                    logger.info(
-                        f"{username} registered successfully by proxy {proxy}"
-                    )
                     if queue:
                         await queue.put((user_data, html))
 
                 return html
+            except asyncio.CancelledError as e:
+                raise e
             except asyncio.TimeoutError as e:
                 raise e
             except AIOHTTP_NET_ERRORS as e:
@@ -600,7 +599,7 @@ async def get_unregister_users(
     **filter_kwargs,
 ):
     api = APIRomania()
-    
+
     try:
         response = await api.see_registrations(
             tip_formular=tip_formular,
@@ -609,7 +608,7 @@ async def get_unregister_users(
         )
     except asyncio.TimeoutError:
         return
-        
+
     registered_users = response["data"]
     registered_usernames = [
         (obj["nume_pasaport"].lower(), obj["prenume_pasaport"].lower())
@@ -626,6 +625,13 @@ async def get_unregister_users(
             unregistered_users.append(user)
 
     return unregistered_users
+
+
+def cancel_asyncio_task(task: asyncio.Task):
+    try:
+        canceled = task.cancel()
+    except asyncio.CancelledError:
+        pass
 
 
 async def registration(
@@ -671,10 +677,6 @@ async def registration(
         while True:
             await asyncio.sleep(0.5)
             dt = moscow_dt_now()
-            # print(
-            #     f"We have {len(pool.proxies)} proxy in pool. "
-            #     f"And {len(proxies)} for site"
-            # )
 
             if do_check_places:
                 try:
@@ -686,7 +688,6 @@ async def registration(
                     )
                 except asyncio.TimeoutError:
                     continue
-                # print(f"Free places - {places}")
                 if not places and successfully_registered:
                     break
                 elif not places:
@@ -699,57 +700,119 @@ async def registration(
             ]
 
             first_user = random.choice(users_for_registrate)
-            proxy = random.choice(proxies) if proxies else None
             try:
-                html = await api.make_registration(
-                    first_user,
-                    registration_date=registration_date,
-                    tip_formular=tip_formular,
-                    proxy=proxy,
-                    queue=queue,
-                )
+                tasks = [
+                    asyncio.create_task(
+                        api.make_registration(
+                            first_user,
+                            registration_date=registration_date,
+                            tip_formular=tip_formular,
+                            proxy=proxy_param_value,
+                            queue=queue,
+                        )
+                    )
+                    for proxy_param_value in proxies + ["False"]
+                ]
+                htmls = []
+                async with asyncio.timeout(4):
+                    for future in asyncio.as_completed(tasks):
+                        html = await future
+                        htmls.append(html)
+                        if html and api.is_success_registration(html):
+                            [cancel_asyncio_task(_task_) for _task_ in tasks]
+                            break
+
             except asyncio.TimeoutError:
                 continue
 
-            if html is None:
+            if all(html is None for html in htmls):
                 continue
-            if api.is_success_registration(html):
-                successfully_registered.append(first_user)
-                users_for_registrate.remove(first_user)
-            else:
-                error = api.get_error_registration_as_text(html)
-                logger.warning(f"error from server: {error}")
-                if error.count("Data înregistrării este dezactivata"):
-                    continue
-                if error == "NU mai este loc":
-                    return
+
+            errors = []
+            for html in filter(None, htmls):
+                if (
+                    api.is_success_registration(html)
+                    and first_user not in successfully_registered
+                ):
+                    successfully_registered.append(first_user)
+                    users_for_registrate.remove(first_user)
+                else:
+                    error = api.get_error_registration_as_text(html)
+                    errors.append(error)
+
+            if any(
+                error.count("Data înregistrării este dezactivata")
+                for error in errors
+            ):
+                continue
+            if any(error == "NU mai este loc" for error in errors):
+                return
+
+            async def registrate(user_data: dict, proxy: str):
+                nonlocal queue
+
+                async with asyncio.timeout(10):
+                    return await api.make_registration(
+                        user_data,
+                        registration_date=registration_date,
+                        tip_formular=tip_formular,
+                        queue=queue,
+                        proxy=proxy,
+                    )
 
             tasks = [
-                api.make_registration(
-                    user_data,
-                    registration_date=registration_date,
-                    tip_formular=tip_formular,
-                    queue=queue,
-                    proxy=proxy,
-                )
+                {
+                    "user_data": user_data,
+                    "tasks": [
+                        asyncio.create_task(registrate(user_data, proxy))
+                        for proxy in proxies + ["False"]
+                    ],
+                }
                 for user_data in users_for_registrate
                 if user_data not in successfully_registered
             ]
 
+            def callback(user_data, task: asyncio.Task):
+                try:
+                    if task.cancelled() or task.cancelling():
+                        return
+                    html = task.result()
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    return
+
+                if not isinstance(html, str):
+                    return
+                if api.is_success_registration(html):
+                    for obj in tasks:
+                        if obj["user_data"] != user_data:
+                            continue
+
+                        for task in obj["tasks"]:
+                            try:
+                                task.cancel()
+                            except asyncio.CancelledError:
+                                pass
+
+            _tasks_ = [t for obj in tasks for t in obj["tasks"]]
+            [
+                t.add_done_callback(
+                    functools.partial(callback, obj["user_data"])
+                )
+                for obj in tasks
+                for t in obj["tasks"]
+            ]
+
             start = datetime.now()
             try:
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                results = await asyncio.gather(*_tasks_, return_exceptions=True)
             except asyncio.TimeoutError:
                 pass
-                # print("timeout")      
             else:
                 empty = [
-                    r
-                    for r in results
-                    if not r or isinstance(r, asyncio.TimeoutError)
+                    r for r in results if not r or isinstance(r, Exception)
                 ]
                 print(
-                    f"Sended {len(tasks)} requests ({len(empty)} failed) "
+                    f"Sended {len(results)} requests ({len(empty)} failed) "
                     f"in {datetime.now() - start}."
                 )
 
@@ -773,13 +836,13 @@ async def registration(
     do_check_places = False
     task = asyncio.create_task(update_proxy_list())
 
-    while len(pool.proxies) < 15:
-        print(f"Wait for 15 proxies, now we have {len(pool.proxies)} proxies")
+    while len(pool.proxies) < 25:
+        print(f"Wait for 25 proxies, now we have {len(pool.proxies)} proxies")
         await asyncio.sleep(1)
 
     proxies = []
 
-    for_site_proxy = 2
+    for_site_proxy = 8
     while len(proxies) < for_site_proxy:
         print(
             f"Wait for {for_site_proxy} proxies for site, "
@@ -788,10 +851,12 @@ async def registration(
         await asyncio.sleep(1)
         continue
 
-    await asyncio.gather(
-        *[make_registration() for _ in range(10)], return_exceptions=True
-    )
-    # await make_registration()
+    # await asyncio.gather(
+    #     *[make_registration() for _ in range(10)], return_exceptions=True
+    # )
+    start = datetime.now()
+    await make_registration()
+    print(f"script took {datetime.now() - start}")
 
     task.cancel()
     for task in report_tasks:
@@ -845,34 +910,34 @@ async def main():
         month=11,
         day=datetime.now().day,
         # year=moscow_dt.year,
-        # month=11,
-        # day=14,
+        # month=10,
+        # day=23,
     )
 
     users_data = get_users_data_from_xslx()
-    filtered_us_data = []
-    attempts = 0
-    
-    while not filtered_us_data:
-        filtered_us_data = await get_unregister_users(
-            users_data,
-            registration_dates=[
-                (registration_date - timedelta(days=7)),
-                registration_date,
-            ],
-            tip_formular=tip_formular,
-        )
-        if (attempts % 5) == 0:
-            await asyncio.sleep(15)
-            continue
-        
-        await asyncio.sleep(3)
-        
-    print(
-        f"Total users - {len(users_data)}, {len(filtered_us_data)} not registered yet"
-    )
-    users_data = filtered_us_data
-    # users_data = generate_fake_users_data(2)
+    # filtered_us_data = []
+    # attempts = 0
+
+    # while not filtered_us_data:
+    #     filtered_us_data = await get_unregister_users(
+    #         users_data,
+    #         registration_dates=[
+    #             (registration_date - timedelta(days=7)),
+    #             registration_date,
+    #         ],
+    #         tip_formular=tip_formular,
+    #     )
+    #     if (attempts % 5) == 0:
+    #         await asyncio.sleep(10)
+    #         continue
+
+    #     await asyncio.sleep(1.5)
+
+    # print(
+    #     f"Total users - {len(users_data)}, {len(filtered_us_data)} not registered yet"
+    # )
+    # users_data = filtered_us_data
+    # users_data = generate_fake_users_data(40)
 
     await registration(tip_formular, registration_date, users_data)
     # await start_registration_with_proccess(
@@ -906,11 +971,14 @@ async def start_scheduler():
         if dt.hour == 9 and dt.minute >= 2:
             break
 
-        await asyncio.sleep(60)
+        await asyncio.sleep(40)
 
     exit(0)
 
 
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    loop.run_until_complete(start_scheduler())
+    try:
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(start_scheduler())
+    except KeyboardInterrupt:
+        exit()

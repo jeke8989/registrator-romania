@@ -418,10 +418,9 @@ class AutomaticProxyPool:
             # Get proxy and url from parameters before do request
             proxy = kwargs.get("proxy")
             url = args[1]
-            proxies = []
             set_ = None
 
-            if not proxy:  # If bool(proxy) == False
+            if not proxy and proxy != "False":  # If bool(proxy) == False
                 async with session._lock:
                     proxy = self_class.get_best_proxy_by_timeout()
                 kwargs["proxy"] = proxy
@@ -458,17 +457,23 @@ class AutomaticProxyPool:
             if self_class.debug and proxy:
                 logger.debug(f"Do request on {url} with proxy {proxy}")
 
-            if proxy:
+            if proxy and proxy != "False":
                 async with session._lock:
                     tsk = asyncio.current_task()
                     msg = f", task - {tsk.get_name()}" if tsk else ""
                     # print(f"{proxy}, set for url: {set_}{msg}")
                     self_class._last_proxy_used = proxy
+            
+            if proxy == "False" and kwargs.get("proxy"):
+                del kwargs["proxy"]
 
             start = datetime.datetime.now()
             try:
                 # async with asyncio.Semaphore(8):
                 result = await session._request_(*args, **kwargs)
+                if kwargs.get("proxy") is None:
+                    return result
+                
                 stop = datetime.datetime.now()
 
                 if proxy:
@@ -533,7 +538,7 @@ class AutomaticProxyPool:
 
                 raise e
             finally:
-                if session._lock.locked():
+                if proxy != "False" and session._lock.locked():
                     session._lock.release()
 
         session._request_ = session._request
