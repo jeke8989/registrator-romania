@@ -98,3 +98,6 @@ def get_users_data_from_csv():
     df = pd.read_csv("users.csv")
     users_data = df.to_dict("records")
     return prepare_users_data(users_data)
+
+
+# print(get_users_data_from_xslx()) 
